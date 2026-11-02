@@ -174,6 +174,19 @@ describe('match lifecycle (2-human room → one final)', () => {
     expect(m.finishedAt).toBe(START + TURN_MS)
   })
 
+  it('earliest deadline wins when two expired (disconnect before turn)', () => {
+    let r = ready(startedRoom(2))
+    const m0 = r.matches[0]
+    r = playMove(r, m0.id, m0.X!, { x: 15, y: 15 }, 0, START, rng)
+    r = playMove(r, m0.id, m0.O!, { x: 16, y: 16 }, 1, START + 20_000, rng) // X to move until START+45s
+    // X last seen at START → X's disconnect deadline START+35s, earlier than the turn deadline.
+    const p = { [m0.X!]: START, [m0.O!]: START + 50_000 }
+    const m = byId(settleRoom(r, p, START + 50_000, rng).room, m0.id)
+    expect(m.endReason).toBe('disconnect_timeout')
+    expect(m.winner).toBe('O')
+    expect(m.finishedAt).toBe(START + 35_000)
+  })
+
   it('duplicate clientMoveNo is a no-op', () => {
     let r = ready(startedRoom(2))
     const m0 = r.matches[0]
@@ -294,6 +307,27 @@ describe('bracket progression', () => {
     // the winning bot advanced into the final, field a (slot 0)
     expect(final(r).a).toBe(bb[bb.winner!])
   }, 30_000)
+
+  it('next match becomes pending when the LATER feeder finished, even if settled out of order', () => {
+    let r = startedRoom(4, 2)
+    const s0 = r.matches.find((m) => m.round === 0 && m.slot === 0)!
+    const s1 = r.matches.find((m) => m.round === 0 && m.slot === 1)!
+    r = ready(r, s1, START) // slot 1 times out at START+25s
+    r = ready(r, s0, START + 20_000) // slot 0 times out at START+45s
+    const everyone = Object.fromEntries(r.players.map((p) => [p.userId, START + 100_000]))
+    const { room } = settleRoom(r, everyone, START + 100_000, rng)
+    expect(byId(room, s1.id).finishedAt).toBe(START + 25_000)
+    expect(byId(room, s0.id).finishedAt).toBe(START + 45_000)
+    for (const m of [final(room), third(room)]) {
+      expect(m.status).toBe('pending') // 55s ≤ NO_SHOW_MS: no no-show yet
+      expect(m.pendingSince).toBe(START + 45_000)
+    }
+    expect(room.status).toBe('running')
+    // ...and the no-show is measured from the correct moment.
+    const later = settleRoom(room, everyone, START + 105_001, rng).room
+    expect(final(later).endReason).toBe('no_show')
+    expect(final(later).finishedAt).toBe(START + 105_000)
+  })
 
   it('4-player bracket: semis losers meet in 3rd place; room finishes with placements', () => {
     let r = startedRoom(4, 2)

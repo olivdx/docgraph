@@ -65,11 +65,18 @@ export function promoteIfReady(room: Room, m: Match, at: number, rng: Rng): bool
   return true
 }
 
-function advance(room: Room, m: Match, at: number, rng: Rng): void {
+function advance(room: Room, m: Match, rng: Rng): void {
   const last = room.totalRounds - 1
   if (m.kind !== 'normal' || m.round >= last || !m.winner) return
   const winnerId = m[m.winner]
   const loserId = m[opposite(m.winner)]
+  // Both the next match and (for semifinals) the 3rd-place match are fed by this match and its
+  // sibling. Settle steps matches in array order, not time order, so the next match becomes
+  // pending when the LATER of the two feeders finished — not when this one did.
+  const sibling = room.matches.find(
+    (x) => x.kind === 'normal' && x.round === m.round && x.slot === (m.slot ^ 1),
+  )
+  const at = Math.max(m.finishedAt ?? 0, sibling?.finishedAt ?? 0)
   const next = room.matches.find((x) => x.kind === 'normal' && x.round === m.round + 1 && x.slot === Math.floor(m.slot / 2))
   if (next) {
     if (m.slot % 2 === 0) next.a = winnerId
@@ -104,7 +111,7 @@ export function finishMatch(
   m.finishedAt = at
   m.turnDeadlineAt = null
   m.botMoveDueAt = null
-  advance(room, m, at, rng)
+  advance(room, m, rng)
 }
 
 function scheduleNext(room: Room, m: Match, at: number, rng: Rng): void {
