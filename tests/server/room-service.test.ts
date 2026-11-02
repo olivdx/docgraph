@@ -314,6 +314,89 @@ describe('RoomService', () => {
     expect((await errCode(svc.getRoom('ZZZZZZ', tg(1)))).code).toBe('not_found')
   })
 
+  it('late move after the deadline returns the finished turn_timeout view and saves it', async () => {
+    const store = new CountingStore()
+    const ctx = setup(store)
+    const { svc, clock } = ctx
+    const code = await startedRoom(ctx, 2)
+    const m = (await loadRoom(ctx, code)).matches[0]
+    const X = tg(Number(m.X!.slice(1)))
+    const O = tg(Number(m.O!.slice(1)))
+    await svc.getMatch(code, m.id, X)
+    await svc.getMatch(code, m.id, O)
+    clock.t += 1000
+    await svc.move(code, m.id, X, { x: 5, y: 5 }, 0)
+    clock.t += 1000
+    await svc.move(code, m.id, O, { x: 6, y: 6 }, 1) // X deadline = T0 + 27s
+    const v0 = (await loadRoom(ctx, code)).version
+    store.replaces = 0
+
+    clock.t = T0 + 30_000 // past the deadline, nobody settled yet
+    const view = await svc.move(code, m.id, X, { x: 7, y: 7 }, 2)
+    expect(view.status).toBe('finished')
+    expect(view.endReason).toBe('turn_timeout')
+    expect(view.winner).toBe('O')
+    expect(view.moves.length).toBe(2) // the late move is rejected
+
+    const saved = await loadRoom(ctx, code)
+    expect(store.replaces).toBe(1)
+    expect(saved.version).toBe(v0 + 1)
+    const sm = saved.matches[0]
+    expect(sm.status).toBe('finished')
+    expect(sm.endReason).toBe('turn_timeout')
+    expect(sm.finishedAt).toBe(T0 + 27_000)
+
+    // late resign on an already-settled match is not_playing (nothing left to settle, no write)
+    expect((await errCode(svc.resign(code, m.id, X))).code).toBe('not_playing')
+    expect(store.replaces).toBe(1)
+  })
+
+  it('late resign after the deadline returns the settled result and saves it', async () => {
+    const ctx = setup()
+    const { svc, clock } = ctx
+    const code = await startedRoom(ctx, 2)
+    const m = (await loadRoom(ctx, code)).matches[0]
+    const X = tg(Number(m.X!.slice(1)))
+    const O = tg(Number(m.O!.slice(1)))
+    await svc.getMatch(code, m.id, X)
+    await svc.getMatch(code, m.id, O)
+    clock.t += 26_000 // X never moved: X loses on time at T0 + 25s
+    const view = await svc.resign(code, m.id, O)
+    expect(view.status).toBe('finished')
+    expect(view.endReason).toBe('turn_timeout')
+    expect(view.winner).toBe('O')
+    expect((await loadRoom(ctx, code)).matches[0].endReason).toBe('turn_timeout')
+  })
+
+  it('a command error after a state-changing settle still persists the settle and rethrows', async () => {
+    const store = new CountingStore()
+    const ctx = setup(store)
+    const { svc, clock } = ctx
+    const code = await startedRoom(ctx, 4)
+    let room = await loadRoom(ctx, code)
+    const semi1 = room.matches.find((m) => m.kind === 'normal' && m.round === 0 && m.slot === 0)!
+    const semi2 = room.matches.find((m) => m.kind === 'normal' && m.round === 0 && m.slot === 1)!
+    for (const id of [semi1.X!, semi1.O!]) await svc.getMatch(code, semi1.id, tg(Number(id.slice(1))))
+    const v0 = (await loadRoom(ctx, code)).version
+    store.replaces = 0
+
+    clock.t += 26_000 // semi1: X's turn deadline expired; semi2 still pending (no-show at 60s)
+    const err = await errCode(svc.move(code, semi2.id, tg(Number(semi2.X!.slice(1))), { x: 1, y: 1 }, 0))
+    expect(err.code).toBe('not_playing')
+    expect(store.replaces).toBe(1)
+    room = await loadRoom(ctx, code)
+    expect(room.version).toBe(v0 + 1)
+    const s1 = room.matches.find((m) => m.id === semi1.id)!
+    expect(s1.status).toBe('finished')
+    expect(s1.endReason).toBe('turn_timeout')
+    expect(room.expiresAt.getTime()).toBe(clock.t + 2 * 60 * 60 * 1000)
+
+    // command error with nothing to settle: no write
+    clock.t += 26_000 // semi1 already finished; semi2 pending for 52s (< 60s no-show)
+    expect((await errCode(svc.start(code, tg(1)))).code).toBe('not_lobby')
+    expect(store.replaces).toBe(1)
+  })
+
   it('list returns open-room summaries', async () => {
     const ctx = setup()
     const { svc, clock } = ctx

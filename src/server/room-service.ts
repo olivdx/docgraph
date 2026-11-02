@@ -38,7 +38,13 @@ const MAX_CODE_ATTEMPTS = 10
 const LIST_LIMIT = 50
 
 type Presence = Record<string, number>
-type Command = (room: Room, presence: Presence, now: number) => Room
+/**
+ * `settled` is the room after settleRoom; `loaded` is the room as read. Room-level commands use
+ * `settled`; match commands use `loaded` (they settle internally with the same presence, which
+ * keeps room.ts's late-move / late-resign contract: a deadline that expired before the command
+ * returns the settled result instead of not_playing).
+ */
+type Command = (settled: Room, presence: Presence, now: number, loaded: Room) => Room
 interface Mutated {
   room: Room
   presence: Presence
@@ -120,7 +126,8 @@ export class RoomService {
   async getMatch(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (r, p, t) => (isParticipant(r, matchId, user.id) ? markReady(r, matchId, user.id, t, this.deps.rng, p) : r),
+      (settled, p, t, loaded) =>
+        isParticipant(loaded, matchId, user.id) ? markReady(loaded, matchId, user.id, t, this.deps.rng, p) : settled,
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -129,7 +136,7 @@ export class RoomService {
   async move(code: string, matchId: string, user: TelegramUser, cell: Cell, clientMoveNo: number): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (r, p, t) => playMove(r, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p),
+      (_s, p, t, loaded) => playMove(loaded, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p),
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -138,7 +145,7 @@ export class RoomService {
   async resign(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (r, p, t) => resignCmd(r, matchId, user.id, t, this.deps.rng, p),
+      (_s, p, t, loaded) => resignCmd(loaded, matchId, user.id, t, this.deps.rng, p),
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -175,7 +182,9 @@ export class RoomService {
 
   /**
    * get → (touch caller) → read presence → settle → command → write only if changed (CAS on
-   * version); retried from a fresh read on CAS failure, up to MAX_ATTEMPTS.
+   * version); retried from a fresh read on CAS failure, up to MAX_ATTEMPTS. If the command throws
+   * a RoomError after a state-changing settle, the settled room is still persisted (same CAS
+   * rules) and then the original error is rethrown.
    */
   private async mutate(code: string, command: Command, caller?: { matchId: string; userId: string }): Promise<Mutated> {
     let touched = false
@@ -189,15 +198,27 @@ export class RoomService {
       }
       const presence = await this.readPresence(loaded, caller?.matchId)
       const settled = settleRoom(loaded, presence, now, this.deps.rng)
-      let next = command(settled.room, presence, now)
+      let next: Room
+      try {
+        next = command(settled.room, presence, now, loaded)
+      } catch (e) {
+        if (!(e instanceof RoomError) || !settled.changed) throw e
+        if (await this.write(settled.room, loaded.version, now)) throw e
+        continue // CAS lost: re-read and retry
+      }
       if (!settled.changed && JSON.stringify(next) === JSON.stringify(loaded)) {
         return { room: loaded, presence, now }
       }
-      if (next.status === 'running') next = { ...next, expiresAt: new Date(now + LOBBY_TTL_MS) }
-      if (await this.deps.rooms.replace(next, loaded.version)) {
-        return { room: { ...next, version: loaded.version + 1 }, presence, now }
-      }
+      const saved = await this.write(next, loaded.version, now)
+      if (saved) return { room: saved, presence, now }
     }
     throw new RoomError('conflict')
+  }
+
+  /** CAS write; a running room gets its activity expiry refreshed. Returns the stored room or null. */
+  private async write(room: Room, version: number, now: number): Promise<Room | null> {
+    const next = room.status === 'running' ? { ...room, expiresAt: new Date(now + LOBBY_TTL_MS) } : room
+    if (!(await this.deps.rooms.replace(next, version))) return null
+    return { ...next, version: version + 1 }
   }
 }
