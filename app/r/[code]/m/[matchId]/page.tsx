@@ -9,6 +9,7 @@ import type { Cell, Side } from '@/src/game/types'
 import type { MatchView } from '@/src/tournament/views'
 
 const POLL_MS = 1_000
+const NEXT_POLL_MS = 3_000 // after the match: waiting for the next match to become pending
 const TICK_MS = 250
 const TURN_MS = 25_000 // mirrors the server's TURN_MS; display only (idle side's clock)
 
@@ -57,6 +58,24 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+/** Delay before the next poll, or null to stop polling (finished, nothing left to wait for). */
+function nextPollDelay(v: MatchView | null): number | null {
+  if (!v || v.status !== 'finished') return POLL_MS
+  if (v.nextStep === 'next_match' && !v.nextMatchId) return NEXT_POLL_MS
+  return null
+}
+
+/** True only the first time this session for `key` (same guard as the bracket page's auto-enter). */
+function firstTime(key: string): boolean {
+  try {
+    if (sessionStorage.getItem(key)) return false
+    sessionStorage.setItem(key, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
 interface Synced {
   view: MatchView
   at: number // local Date.now() when the view was received
@@ -75,10 +94,12 @@ export default function MatchPage() {
   const flying = useRef(false)
   const seq = useRef(0)
   const applied = useRef(0)
+  const latest = useRef<MatchView | null>(null)
 
   const apply = useCallback((my: number, view: MatchView) => {
     if (my < applied.current) return
     applied.current = my
+    latest.current = view
     const at = Date.now()
     setState({ view, at })
     setNow(at)
@@ -96,21 +117,42 @@ export default function MatchPage() {
     }
   }, [path, apply])
 
+  // Completion-chained polling: the next request is scheduled only after the previous one settled.
+  // Paused while hidden; 1 s while the match is live, 3 s on the result card while waiting for the
+  // next match, stopped otherwise.
   useEffect(() => {
-    const first = setTimeout(() => void poll(), 0)
-    const id = setInterval(() => {
-      if (!document.hidden) void poll()
-    }, POLL_MS)
-    const onVis = () => {
-      if (!document.hidden) void poll()
+    let stopped = false
+    let running = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const run = async () => {
+      timer = null
+      if (stopped || running || document.hidden) return
+      running = true
+      await poll()
+      running = false
+      if (stopped) return
+      const delay = nextPollDelay(latest.current)
+      if (delay !== null) timer = setTimeout(() => void run(), delay)
     }
+    const onVis = () => {
+      if (document.hidden || running) return
+      if (timer) clearTimeout(timer)
+      void run()
+    }
+    timer = setTimeout(() => void run(), 0)
     document.addEventListener('visibilitychange', onVis)
     return () => {
-      clearTimeout(first)
-      clearInterval(id)
+      stopped = true
+      if (timer) clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [poll])
+
+  // Your next match became pending: enter it automatically (once per session, like the bracket page).
+  const nextMatchId = state?.view.you ? state.view.nextMatchId : null
+  useEffect(() => {
+    if (nextMatchId && firstTime(`auto:${nextMatchId}`)) router.push(`/r/${code}/m/${nextMatchId}`)
+  }, [nextMatchId, code, router])
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS)
@@ -285,7 +327,13 @@ export default function MatchPage() {
         )}
       </div>
 
-      {finished && <Result view={view} onBracket={toBracket} />}
+      {finished && (
+        <Result
+          view={view}
+          onBracket={toBracket}
+          onNext={view.you && view.nextMatchId ? () => router.push(`/r/${code}/m/${view.nextMatchId}`) : null}
+        />
+      )}
 
       {toast && (
         <div className="fixed inset-x-4 bottom-4 mx-auto max-w-md rounded-xl border border-line bg-panel p-3 text-center text-sm shadow-lg">
@@ -296,7 +344,15 @@ export default function MatchPage() {
   )
 }
 
-function Result({ view, onBracket }: { view: MatchView; onBracket: () => void }) {
+function Result({
+  view,
+  onBracket,
+  onNext,
+}: {
+  view: MatchView
+  onBracket: () => void
+  onNext: (() => void) | null
+}) {
   const { you, winner, endReason } = view
   const winnerName = winner ? (view.players[winner]?.name ?? '?') : null
   const loserName = winner ? (view.players[opposite(winner)]?.name ?? '?') : '?'
@@ -326,7 +382,20 @@ function Result({ view, onBracket }: { view: MatchView; onBracket: () => void })
         <div className="mt-1.5 mb-3.5 text-[13px] text-muted">
           {[reason, next].filter(Boolean).join(' · ')}
         </div>
-        <button onClick={onBracket} className="block w-full rounded-xl bg-accent p-[13px] text-[15px] font-semibold text-white">
+        {onNext && (
+          <div className="mb-2.5 rounded-xl border border-accent p-3">
+            <div className="mb-2 font-semibold">Your next match is ready</div>
+            <button onClick={onNext} className="block w-full rounded-xl bg-accent p-[13px] text-[15px] font-semibold text-white">
+              Enter match →
+            </button>
+          </div>
+        )}
+        <button
+          onClick={onBracket}
+          className={`block w-full rounded-xl p-[13px] text-[15px] font-semibold ${
+            onNext ? 'border border-line bg-panel2 text-text' : 'bg-accent text-white'
+          }`}
+        >
           View bracket
         </button>
       </div>

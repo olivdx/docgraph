@@ -32,7 +32,26 @@ export default function Home() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ text: string; code?: string } | null>(null)
   const rooms = usePoll<RoomSummary[]>(booting ? null : '/api/rooms', 10_000)
-  const me = usePoll<Me>(booting ? null : '/api/me', 60_000)
+  const [hasActive, setHasActive] = useState(false)
+  // While you're in a tournament, check often whether your next match is ready.
+  const me = usePoll<Me>(booting ? null : '/api/me', hasActive ? 10_000 : 60_000)
+  const nowActive = !!me.data?.active
+  if (nowActive !== hasActive) setHasActive(nowActive) // adjust state while rendering (no extra effect)
+
+  // A pending/playing match of yours: enter it once (same sessionStorage guard as the bracket page).
+  const activeCode = me.data?.active?.code ?? null
+  const activeMatchId = me.data?.active?.matchId ?? null
+  useEffect(() => {
+    if (!activeCode || !activeMatchId) return
+    try {
+      const k = `auto:${activeMatchId}`
+      if (sessionStorage.getItem(k)) return
+      sessionStorage.setItem(k, '1')
+    } catch {
+      return
+    }
+    router.push(`/r/${activeCode}/m/${activeMatchId}`)
+  }, [activeCode, activeMatchId, router])
 
   useEffect(() => {
     initTelegram()

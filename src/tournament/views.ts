@@ -65,6 +65,8 @@ export interface MatchView {
   endReason: EndReason | null
   winLine: Cell[] | null
   nextStep: NextStep
+  /** The viewer's pending|playing match in this room other than this one (where to go next), else null. */
+  nextMatchId: string | null
   serverNow: number
 }
 
@@ -199,6 +201,13 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
     endReason: m.endReason,
     winLine: m.winLine,
     nextStep: nextStepFor(room, m, you),
+    nextMatchId:
+      room.matches.find(
+        (x) =>
+          x.id !== m.id &&
+          (x.a === viewerId || x.b === viewerId) &&
+          (x.status === 'pending' || x.status === 'playing'),
+      )?.id ?? null,
     serverNow: now,
   }
 }

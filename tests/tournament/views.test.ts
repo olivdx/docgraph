@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createRoom, joinRoom, startRoom } from '@/src/tournament/room'
 import { toMatchView, toRoomSummary, toRoomView } from '@/src/tournament/views'
+import { finishMatch } from '@/src/tournament/match'
 import { DISCONNECT_DETECT_MS, NO_SHOW_MS, TURN_MS } from '@/src/tournament/constants'
 import type { Match, Room } from '@/src/tournament/types'
 import { mulberry, user } from './helpers'
@@ -154,5 +155,30 @@ describe('MatchView', () => {
       expect(step(r, q, q.X!)).toBe('next_match')
       expect(step(r, q, q.O!)).toBe('eliminated')
     })
+  })
+
+  it("nextMatchId: viewer's other pending or playing match once it exists, else null", () => {
+    const r = started(4)
+    const semiA = r.matches.find((m) => m.kind === 'normal' && m.round === 0 && m.slot === 0)!
+    const semiB = r.matches.find((m) => m.kind === 'normal' && m.round === 0 && m.slot === 1)!
+    const final = r.matches.find((m) => m.kind === 'normal' && m.round === 1)!
+    const third = r.matches.find((m) => m.kind === 'third_place')!
+    const next = (m: Match, uid: string) => toMatchView(r, m.id, uid, T0 + 1, {}).nextMatchId
+
+    // while the semi is pending, the viewer has no OTHER open match
+    expect(next(semiA, semiA.X!)).toBeNull()
+    finishMatch(r, semiA, 'X', 'resign', T0 + 1, mulberry(1))
+    // the final / 3rd place still wait for the other semifinal
+    expect(next(semiA, semiA.X!)).toBeNull()
+    expect(next(semiA, semiA.O!)).toBeNull()
+    finishMatch(r, semiB, 'O', 'resign', T0 + 2, mulberry(1))
+    expect(final.status).toBe('pending')
+    expect(third.status).toBe('pending')
+    expect(next(semiA, semiA.X!)).toBe(final.id)
+    expect(next(semiA, semiA.O!)).toBe(third.id)
+    expect(next(semiB, semiB.O!)).toBe(final.id)
+    // spectators and the current match itself never count
+    expect(next(semiA, 'spectator')).toBeNull()
+    expect(next(final, semiA.X!)).toBeNull()
   })
 })
