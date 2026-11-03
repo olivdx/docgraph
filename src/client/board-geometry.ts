@@ -33,3 +33,19 @@ export function boundsCenter(cells: Cell[]): Cell {
     y: Math.floor((Math.min(...ys) + Math.max(...ys)) / 2),
   }
 }
+
+/** Whether the whole cell lies inside the visible scroll window. */
+export function isCellVisible(
+  cell: Cell,
+  cellSize: number,
+  view: { left: number; top: number; width: number; height: number },
+): boolean {
+  const x0 = cell.x * cellSize
+  const y0 = cell.y * cellSize
+  return (
+    x0 >= view.left &&
+    y0 >= view.top &&
+    x0 + cellSize <= view.left + view.width &&
+    y0 + cellSize <= view.top + view.height
+  )
+}

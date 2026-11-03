@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { boundsCenter, cellAt, scrollToCenter } from '@/src/client/board-geometry'
+import { boundsCenter, cellAt, isCellVisible, scrollToCenter } from '@/src/client/board-geometry'
 
 describe('cellAt', () => {
   it('maps the top-left pixel to (0,0)', () => {
@@ -42,5 +42,19 @@ describe('boundsCenter', () => {
   })
   it('returns the center of the bounding box', () => {
     expect(boundsCenter([{ x: 2, y: 4 }, { x: 10, y: 8 }, { x: 5, y: 6 }])).toEqual({ x: 6, y: 6 })
+  })
+})
+
+describe('isCellVisible', () => {
+  const view = { left: 320, top: 160, width: 320, height: 480 } // cells x 10..19, y 5..19 at 32 px
+  it('true when the whole cell is inside the scroll window', () => {
+    expect(isCellVisible({ x: 10, y: 5 }, 32, view)).toBe(true)
+    expect(isCellVisible({ x: 19, y: 19 }, 32, view)).toBe(true)
+  })
+  it('false when the cell is outside or only partly visible', () => {
+    expect(isCellVisible({ x: 9, y: 10 }, 32, view)).toBe(false)
+    expect(isCellVisible({ x: 20, y: 10 }, 32, view)).toBe(false)
+    expect(isCellVisible({ x: 12, y: 4 }, 32, view)).toBe(false)
+    expect(isCellVisible({ x: 12, y: 5 }, 32, { ...view, top: 170 })).toBe(false)
   })
 })

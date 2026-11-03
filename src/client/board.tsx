@@ -1,8 +1,8 @@
 'use client'
 
-import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { BOARD_SIZE, type Cell, type Move, type Side } from '@/src/game/types'
-import { boundsCenter, cellAt, scrollToCenter } from './board-geometry'
+import { boundsCenter, cellAt, isCellVisible, scrollToCenter } from './board-geometry'
 import { Mark } from './marks'
 
 export const ZOOM_STEPS = [24, 32, 44] as const
@@ -28,10 +28,10 @@ interface Props {
 
 const key = (c: Cell) => `${c.x},${c.y}`
 
-function scrollEl(el: HTMLDivElement | null, cell: Cell, size: number) {
+function scrollEl(el: HTMLDivElement | null, cell: Cell, size: number, behavior: ScrollBehavior = 'auto') {
   if (!el) return
   const { left, top } = scrollToCenter(cell, size, { width: el.clientWidth, height: el.clientHeight })
-  el.scrollTo({ left, top })
+  el.scrollTo({ left, top, behavior })
 }
 
 export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: Props) {
@@ -50,6 +50,23 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
     if (target.current) scrollEl(scroller.current, target.current, cs)
     target.current = null
   }, [cs])
+
+  // A new last move (typically the opponent's) outside the viewport: glide to it. A visible one
+  // leaves the viewport alone, so your own taps never move the board.
+  const lastX = last?.x ?? -1
+  const lastY = last?.y ?? -1
+  const seenLast = useRef(last ? key(last) : '')
+  useEffect(() => {
+    if (lastX < 0) return
+    const k = `${lastX},${lastY}`
+    if (k === seenLast.current) return
+    seenLast.current = k
+    const el = scroller.current
+    if (!el) return
+    const cell = { x: lastX, y: lastY }
+    const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight }
+    if (!isCellVisible(cell, cs, view)) scrollEl(el, cell, cs, 'smooth')
+  }, [lastX, lastY, cs])
 
   const viewCenter = (): Cell => {
     const el = scroller.current
