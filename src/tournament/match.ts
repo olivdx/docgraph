@@ -1,12 +1,13 @@
 import { chooseBotMove } from '@/src/game/bot'
 import { buildBoard, findWin, sideToMove } from '@/src/game/rules'
-import { BOARD_SIZE, type Cell, type Side } from '@/src/game/types'
+import type { Cell, Side } from '@/src/game/types'
 import {
   BOT_DELAY_MAX_MS,
   BOT_DEFER_MAX_MS,
   BOT_DELAY_MIN_MS,
   BOT_TIME_BUDGET_MS,
   DISCONNECT_DETECT_MS,
+  MAX_BOT_GAME_MOVES,
   NO_SHOW_MS,
   RECONNECT_GRACE_MS,
   TURN_MS,
@@ -39,8 +40,6 @@ export interface SettleOpts {
 }
 
 type Rng = () => number
-
-const BOARD_CELLS = BOARD_SIZE * BOARD_SIZE
 
 export const opposite = (s: Side): Side => (s === 'X' ? 'O' : 'X')
 
@@ -140,17 +139,13 @@ function scheduleNext(room: Room, m: Match, at: number, rng: Rng): void {
   }
 }
 
-/** Places a stone and resolves win / board-full. Returns true if the match finished. */
+/** Places a stone and resolves a win. Returns true if the match finished. */
 function placeStone(room: Room, m: Match, cell: Cell, side: Side, at: number, rng: Rng): boolean {
   const move = { x: cell.x, y: cell.y, side, at }
   m.moves.push(move)
   const win = findWin(buildBoard(m.moves), move)
   if (win) {
     finishMatch(room, m, side, 'five_in_row', at, rng, win)
-    return true
-  }
-  if (m.moves.length >= BOARD_CELLS) {
-    finishMatch(room, m, 'X', 'board_full', at, rng)
     return true
   }
   return false
@@ -169,7 +164,7 @@ function startPlaying(room: Room, m: Match, at: number, rng: Rng): void {
     m.turnDeadlineAt = null
     m.botMoveDueAt = null
     for (;;) {
-      if (m.moves.length >= BOARD_CELLS) {
+      if (m.moves.length >= MAX_BOT_GAME_MOVES) {
         finishMatch(room, m, 'X', 'board_full', at, rng)
         return
       }
@@ -245,7 +240,7 @@ export function stepMatch(
       } else {
         const scope = opts?.fullBotMatchId
         if (scope !== undefined && scope !== m.id && now - ev.at <= BOT_DEFER_MAX_MS) return false
-        if (m.moves.length >= BOARD_CELLS) {
+        if (m.moves.length >= MAX_BOT_GAME_MOVES) {
           finishMatch(room, m, 'X', 'board_full', ev.at, rng)
         } else {
           const side = sideToMove(m.moves)

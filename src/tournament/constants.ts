@@ -10,6 +10,11 @@ export const BOT_DELAY_MIN_MS = 500
 export const BOT_DELAY_MAX_MS = 1000
 export const BOT_TIME_BUDGET_MS = 250
 /**
+ * Safety cap for games the bot keeps going on its own: a bot-vs-bot game (or a bot move due in a
+ * human-vs-bot game) at this many moves without a winner ends 'board_full', X wins.
+ */
+export const MAX_BOT_GAME_MOVES = 900
+/**
  * Out-of-scope settles leave a due full-strength bot move to its own match's poller, but only for
  * this long: after that the human evidently stopped polling and any settle plays it (no stall).
  */

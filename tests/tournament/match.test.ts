@@ -204,9 +204,21 @@ describe('match lifecycle (2-human room → one final)', () => {
     expect(code(() => playMove(r, m0.id, m0.O!, { x: 1, y: 1 }, 0, START + 10, rng))).toBe('not_your_turn')
     r = playMove(r, m0.id, m0.X!, { x: 1, y: 1 }, 0, START + 10, rng)
     expect(code(() => playMove(r, m0.id, m0.O!, { x: 1, y: 1 }, 1, START + 20, rng))).toBe('occupied')
-    expect(code(() => playMove(r, m0.id, m0.O!, { x: 30, y: 1 }, 1, START + 20, rng))).toBe('out_of_bounds')
-    expect(code(() => playMove(r, m0.id, m0.O!, { x: -1, y: 1 }, 1, START + 20, rng))).toBe('out_of_bounds')
+    expect(code(() => playMove(r, m0.id, m0.O!, { x: 50, y: 1 }, 1, START + 20, rng))).toBe('out_of_bounds')
+    expect(code(() => playMove(r, m0.id, m0.O!, { x: -51, y: 1 }, 1, START + 20, rng))).toBe('out_of_bounds')
+    expect(code(() => playMove(r, m0.id, m0.O!, { x: 1, y: 50 }, 1, START + 20, rng))).toBe('out_of_bounds')
+    expect(code(() => playMove(r, m0.id, m0.O!, { x: 1, y: -51 }, 1, START + 20, rng))).toBe('out_of_bounds')
+    expect(code(() => playMove(r, m0.id, m0.O!, { x: 1.5, y: 1 }, 1, START + 20, rng))).toBe('out_of_bounds')
     expect(code(() => playMove(r, m0.id, 'stranger', { x: 2, y: 2 }, 1, START + 20, rng))).toBe('not_participant')
+  })
+
+  it('accepts negative coordinates and both board edges (-50 and 49)', () => {
+    let r = ready(startedRoom(2))
+    const id = r.matches[0].id
+    r = play(r, id, [{ x: -50, y: -50 }, { x: 49, y: 49 }, { x: -1, y: -1 }, { x: 49, y: -50 }], START + 10)
+    const m = byId(r, id)
+    expect(m.moves.map((mv) => [mv.x, mv.y])).toEqual([[-50, -50], [49, 49], [-1, -1], [49, -50]])
+    expect(m.status).toBe('playing')
   })
 
   it('both-blocked five does not finish', () => {
