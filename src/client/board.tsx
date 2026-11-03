@@ -1,21 +1,22 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { BOARD_SIZE, type Cell, type Move, type Side } from '@/src/game/types'
-import { boundsCenter, cellAt, isCellVisible, scrollToCenter } from './board-geometry'
+import { useEffect, useLayoutEffect, useMemo, useRef, type PointerEvent } from 'react'
+import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from '@/src/game/types'
+import {
+  CELL_PX,
+  boundsCenter,
+  cellAtPoint,
+  clampOffset,
+  isCellVisible,
+  isTap,
+  offsetToCenterOn,
+  type Offset,
+} from './board-geometry'
 import { Mark } from './marks'
 
-export const ZOOM_STEPS = [24, 32, 44] as const
-const DEFAULT_ZOOM = 1
 const LAST_MOVE_BG = 'rgba(59,130,246,.18)'
 const WIN_BG = 'rgba(34,197,94,.30)'
-
-type ZoomKind = 'in' | 'out' | 'fit'
-const ZOOM_BUTTONS: { kind: ZoomKind; label: string; title: string }[] = [
-  { kind: 'in', label: '＋', title: 'Zoom in' },
-  { kind: 'out', label: '－', title: 'Zoom out' },
-  { kind: 'fit', label: '⤡', title: 'Fit' },
-]
+const GLIDE = 'transform 320ms ease'
 
 interface Props {
   moves: Move[]
@@ -28,97 +29,141 @@ interface Props {
 
 const key = (c: Cell) => `${c.x},${c.y}`
 
-function scrollEl(el: HTMLDivElement | null, cell: Cell, size: number, behavior: ScrollBehavior = 'auto') {
-  if (!el) return
-  const { left, top } = scrollToCenter(cell, size, { width: el.clientWidth, height: el.clientHeight })
-  el.scrollTo({ left, top, behavior })
-}
+type Drag = { id: number; sx: number; sy: number; from: Offset; panning: boolean }
 
+/**
+ * The 100×100 board (-50..49) in a fixed-size viewport you drag to pan (no zoom). Only the paper
+ * rectangle and the stones are in the DOM; the grid is a CSS background on the paper. Pan updates
+ * write the plane's transform directly (no re-render per pointer move).
+ */
 export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: Props) {
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
-  const cs = ZOOM_STEPS[zoom]
-  const scroller = useRef<HTMLDivElement>(null)
+  const cs = CELL_PX
+  const viewport = useRef<HTMLDivElement>(null)
+  const plane = useRef<HTMLDivElement>(null)
+  const offset = useRef<Offset>({ x: 0, y: 0 })
+  const drag = useRef<Drag | null>(null)
   const last = moves.length > 0 ? moves[moves.length - 1] : null
-  // Where to scroll after the next layout: on mount, the last move (or the center).
-  const target = useRef<Cell | null>(last ? { x: last.x, y: last.y } : boundsCenter([]))
 
   const occupied = useMemo(() => new Set(moves.map(key)), [moves])
   const winSet = useMemo(() => new Set((winLine ?? []).map(key)), [winLine])
   const canPlay = !disabled && you !== null && you === turn
 
+  const size = () => {
+    const el = viewport.current
+    return { w: el?.clientWidth ?? 0, h: el?.clientHeight ?? 0 }
+  }
+
+  const setOffset = (o: Offset, smooth = false) => {
+    const { w, h } = size()
+    const next = clampOffset(o, w, h, cs)
+    offset.current = next
+    const el = plane.current
+    if (!el) return
+    el.style.transition = smooth ? GLIDE : 'none'
+    el.style.transform = `translate3d(${next.x}px, ${next.y}px, 0)`
+  }
+
+  const centerOn = (cell: Cell, smooth = false) => {
+    const { w, h } = size()
+    setOffset(offsetToCenterOn(cell, w, h, cs), smooth)
+  }
+
+  // Initial view: the last move, else (0,0). Resizes keep the same board point in the center.
+  const initialCell = useRef<Cell>(last ? { x: last.x, y: last.y } : { x: 0, y: 0 })
   useLayoutEffect(() => {
-    if (target.current) scrollEl(scroller.current, target.current, cs)
-    target.current = null
-  }, [cs])
+    const el = viewport.current
+    if (!el) return
+    centerOn(initialCell.current)
+    let prev = { w: el.clientWidth, h: el.clientHeight }
+    const ro = new ResizeObserver(() => {
+      const now = { w: el.clientWidth, h: el.clientHeight }
+      if (now.w === prev.w && now.h === prev.h) return
+      const o = offset.current
+      setOffset({ x: o.x + (now.w - prev.w) / 2, y: o.y + (now.h - prev.h) / 2 })
+      prev = now
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only; helpers read refs
+  }, [])
 
   // A new last move (typically the opponent's) outside the viewport: glide to it. A visible one
-  // leaves the viewport alone, so your own taps never move the board.
-  const lastX = last?.x ?? -1
-  const lastY = last?.y ?? -1
+  // leaves the view alone, so your own taps never move the board.
+  const lastX = last?.x ?? null
+  const lastY = last?.y ?? null
   const seenLast = useRef(last ? key(last) : '')
   useEffect(() => {
-    if (lastX < 0) return
+    if (lastX === null || lastY === null) return
     const k = `${lastX},${lastY}`
     if (k === seenLast.current) return
     seenLast.current = k
-    const el = scroller.current
-    if (!el) return
     const cell = { x: lastX, y: lastY }
-    const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight }
-    if (!isCellVisible(cell, cs, view)) scrollEl(el, cell, cs, 'smooth')
+    const { w, h } = size()
+    if (!isCellVisible(cell, offset.current, w, h, cs)) centerOn(cell, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- helpers read refs only
   }, [lastX, lastY, cs])
 
-  const viewCenter = (): Cell => {
-    const el = scroller.current
-    if (!el) return boundsCenter([])
-    const c = Math.floor((el.scrollLeft + el.clientWidth / 2) / cs)
-    const r = Math.floor((el.scrollTop + el.clientHeight / 2) / cs)
-    const clamp = (v: number) => Math.min(BOARD_SIZE - 1, Math.max(0, v))
-    return { x: clamp(c), y: clamp(r) }
+  const onRecenter = () => centerOn(last ? { x: last.x, y: last.y } : boundsCenter(moves), true)
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (drag.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, from: offset.current, panning: false }
   }
 
-  const setZoomTo = (next: number, center: Cell, recenter = false) => {
-    if (next === zoom) {
-      if (recenter) scrollEl(scroller.current, center, cs)
-      return
-    }
-    target.current = center
-    setZoom(next)
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current
+    if (!d || d.id !== e.pointerId) return
+    const dx = e.clientX - d.sx
+    const dy = e.clientY - d.sy
+    if (!d.panning && isTap(dx, dy)) return
+    d.panning = true // once past the slop it stays a pan, even if the pointer comes back
+    setOffset({ x: d.from.x + dx, y: d.from.y + dy })
   }
 
-  const onZoom = (kind: ZoomKind) => {
-    if (kind === 'in') setZoomTo(Math.min(ZOOM_STEPS.length - 1, zoom + 1), viewCenter())
-    else if (kind === 'out') setZoomTo(Math.max(0, zoom - 1), viewCenter())
-    else setZoomTo(0, boundsCenter(moves), true)
-  }
-
-  const onClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (!canPlay) return
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current
+    if (!d || d.id !== e.pointerId) return
+    drag.current = null
+    if (d.panning || !isTap(e.clientX - d.sx, e.clientY - d.sy) || !canPlay) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const cell = cellAt(e.clientX - rect.left, e.clientY - rect.top, cs)
+    const cell = cellAtPoint(e.clientX - rect.left, e.clientY - rect.top, offset.current, cs)
     if (!cell || occupied.has(key(cell))) return
     onPlay(cell)
   }
 
-  const total = BOARD_SIZE * cs
+  const onPointerCancel = (e: PointerEvent<HTMLDivElement>) => {
+    if (drag.current?.id === e.pointerId) drag.current = null
+  }
+
+  const span = (BOARD_MAX - BOARD_MIN + 1) * cs
   const cellBox = (c: Cell) => ({ left: c.x * cs + 1, top: c.y * cs + 1, width: cs - 1, height: cs - 1 })
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-paper">
-      <div ref={scroller} className="absolute inset-0 overflow-auto overscroll-contain">
-        <div
-          onClick={onClick}
-          className={`relative ${canPlay ? 'cursor-pointer' : ''}`}
-          style={{
-            width: total + 1,
-            height: total + 1,
-            touchAction: 'manipulation',
-            backgroundColor: 'var(--paper)',
-            backgroundImage:
-              'linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px)',
-            backgroundSize: `${cs}px ${cs}px`,
-          }}
-        >
+    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-bg">
+      <div
+        ref={viewport}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        className={`absolute inset-0 overflow-hidden select-none ${canPlay ? 'cursor-pointer' : 'cursor-grab'}`}
+        style={{ touchAction: 'none' }}
+      >
+        <div ref={plane} className="absolute top-0 left-0" style={{ willChange: 'transform' }}>
+          <div
+            className="absolute"
+            style={{
+              left: BOARD_MIN * cs,
+              top: BOARD_MIN * cs,
+              width: span + 1,
+              height: span + 1,
+              backgroundColor: 'var(--paper)',
+              backgroundImage:
+                'linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px)',
+              backgroundSize: `${cs}px ${cs}px`,
+            }}
+          />
           {[...winSet].map((k) => {
             const [x, y] = k.split(',').map(Number)
             return <div key={`w${k}`} className="absolute" style={{ ...cellBox({ x, y }), background: WIN_BG }} />
@@ -133,20 +178,15 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
           ))}
         </div>
       </div>
-      <div className="absolute right-2.5 bottom-2.5 flex flex-col gap-1.5">
-        {ZOOM_BUTTONS.map((b) => (
-          <button
-            key={b.kind}
-            type="button"
-            title={b.title}
-            aria-label={b.title}
-            onClick={() => onZoom(b.kind)}
-            className="grid size-8 place-items-center rounded-[9px] bg-white font-bold text-slate-700 shadow-[0_1px_4px_rgba(0,0,0,.15)]"
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        title="Recenter"
+        aria-label="Recenter"
+        onClick={onRecenter}
+        className="absolute right-2.5 bottom-2.5 grid size-8 place-items-center rounded-[9px] bg-white font-bold text-slate-700 shadow-[0_1px_4px_rgba(0,0,0,.15)]"
+      >
+        ⌖
+      </button>
     </div>
   )
 }
