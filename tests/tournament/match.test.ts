@@ -315,7 +315,7 @@ describe('bracket progression', () => {
   })
 
   it('bot vs bot later-round match resolves inside one settle', () => {
-    // 5 humans → 8 slots with bots in round-0 slots 0..2; humans of slots 0 and 1 resign → bots meet.
+    // 5 humans → 8 slots, 3 bot pairs (with seed 3, slots 0 and 1 among them); those humans resign → bots meet.
     let r = startedRoom(5, 3)
     const s0 = r.matches.find((m) => m.round === 0 && m.slot === 0)!
     const s1 = r.matches.find((m) => m.round === 0 && m.slot === 1)!

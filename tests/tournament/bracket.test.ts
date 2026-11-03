@@ -50,6 +50,29 @@ describe('planBracket', () => {
       expect(b.joinedAt).toBe(0)
     }
   })
+  it('bot pairs are spread over the bracket, not always the first K pairs', () => {
+    const botPairs = (n: number, seed: number) => {
+      const { order } = planBracket(humans(n), mulberry(seed))
+      const pairs: number[] = []
+      for (let s = 0; s < order.length / 2; s++) {
+        expect(order[2 * s].isBot).toBe(false) // human always first, never bot vs bot
+        if (order[2 * s + 1].isBot) pairs.push(s)
+      }
+      return pairs
+    }
+    for (const n of [3, 5, 6, 9, 13]) {
+      const seen = new Set<string>()
+      for (let seed = 1; seed <= 20; seed++) {
+        const pairs = botPairs(n, seed)
+        let size = 2
+        while (size < n) size *= 2
+        expect(pairs).toHaveLength(size - n) // exactly one bot per bot pair
+        seen.add(pairs.join(','))
+      }
+      const firstK = Array.from({ length: [...seen][0].split(',').length }, (_, i) => i).join(',')
+      expect([...seen].some((p) => p !== firstK)).toBe(true)
+    }
+  })
   it('does not mutate input', () => {
     const h = humans(5)
     const copy = JSON.parse(JSON.stringify(h))

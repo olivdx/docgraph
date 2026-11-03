@@ -22,12 +22,16 @@ export function planBracket(
   }
   const botCount = size - humans.length // always <= size/2, so each bot gets its own pair
   const hs = shuffle(humans, rng)
+  // Which round-1 pairs get a bot: a random subset, so bots don't cluster at the top of the bracket.
+  const pairs = Array.from({ length: size / 2 }, (_, i) => i)
+  const botPairs = new Set(shuffle(pairs, rng).slice(0, botCount))
   const order: Player[] = []
   let h = 0
+  let n = 0
   for (let s = 0; s < size / 2; s++) {
-    order.push(hs[h++])
-    if (s < botCount) {
-      const n = s + 1
+    order.push(hs[h++]) // the human always takes the odd (first) position of the pair
+    if (botPairs.has(s)) {
+      n++
       order.push({ userId: `bot:${n}`, name: BOT_NAMES[(n - 1) % BOT_NAMES.length], avatarUrl: null, isBot: true, seed: null, joinedAt: 0 })
     } else {
       order.push(hs[h++])
