@@ -1,7 +1,13 @@
-import { BOARD_SIZE, type Cell, type Move, type Side } from './types';
+import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from './types';
 
 /**
  * Caro bot. Rules: 5+ in a row wins unless BOTH ends are blocked (opponent stone or board edge).
+ *
+ * The board is 100×100 (BOARD_MIN..BOARD_MAX), but the bot works on a local window: the stones'
+ * bounding box grown by WINDOW_MARGIN cells, clamped to the board. Candidates are empty cells within
+ * distance 2 of a stone and inside the window. Cells outside the window but on the board read as
+ * EMPTY in pattern evaluation (there are no stones there); only cells beyond the board read as
+ * blocked — so the window never creates a phantom edge.
  *
  * Pattern evaluation works on an 11-cell line window centred on a candidate cell. Every window is
  * classified recursively (five → four → three → two) by asking "how many / which empty cells turn
@@ -11,8 +17,8 @@ import { BOARD_SIZE, type Cell, type Move, type Side } from './types';
 
 export type BotOptions = { mode: 'full' | 'fast'; timeBudgetMs?: number; rng?: () => number };
 
-const N = BOARD_SIZE;
-const CENTER = Math.floor(N / 2);
+/** ≥ 7 keeps every pattern window (candidate ±5, candidate ≤ 2 from a stone) inside the window. */
+const WINDOW_MARGIN = 8;
 const EMPTY = 0;
 const DIRS: [number, number][] = [
   [1, 0],
@@ -90,15 +96,20 @@ function level(code: number): number {
 }
 
 // ---- board helpers -------------------------------------------------------------------------
-type Board = Int8Array; // index y*N+x; 0 empty, 1 X, 2 O
 
 const sideCode = (s: Side) => (s === 'X' ? 1 : 2);
 
 /** Number of directions that form a four (closed or open) for the last scored cell. */
 let lastFours = 0;
 
-/** Value of `side` (1|2) playing at empty cell (x,y). */
-function cellScore(b: Board, x: number, y: number, side: number): number {
+/** Value of `side` (1|2) playing at empty window cell (x,y) (window coordinates). */
+function cellScore(e: Engine, x: number, y: number, side: number): number {
+  const { b, w, h } = e;
+  // Window-coordinate bounds of the real board: beyond them is blocked; window-outside is empty.
+  const minX = BOARD_MIN - e.x0;
+  const maxX = BOARD_MAX - e.x0;
+  const minY = BOARD_MIN - e.y0;
+  const maxY = BOARD_MAX - e.y0;
   let sum = 0;
   let fours = 0;
   let open3 = 0;
@@ -112,9 +123,9 @@ function cellScore(b: Board, x: number, y: number, side: number): number {
       const xx = x + dx * k;
       const yy = y + dy * k;
       let digit: number;
-      if (xx < 0 || yy < 0 || xx >= N || yy >= N) digit = 2;
+      if (xx < 0 || yy < 0 || xx >= w || yy >= h) digit = xx < minX || yy < minY || xx > maxX || yy > maxY ? 2 : 0;
       else {
-        const v = b[yy * N + xx];
+        const v = b[yy * w + xx];
         digit = v === EMPTY ? 0 : v === side ? 1 : 2;
       }
       code += digit * POW3[i];
@@ -147,13 +158,46 @@ type Gen = {
 const CAP = 1e6; // cap per-cell contributions to the static evaluation
 
 class Engine {
-  b: Board = new Int8Array(N * N);
-  near = new Int16Array(N * N);
+  /** Window origin (board coordinates) and size. Window cell index = (y - y0) * w + (x - x0). */
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  b: Int8Array; // 0 empty, 1 X, 2 O
+  near: Int16Array; // stones within Chebyshev distance 2
+  cand = new Set<number>(); // cells with near > 0 (occupied ones are skipped by gen)
+  score: Float64Array; // move score by cell index; shared by nested gen calls
   deadline = Infinity;
   checkTime = false;
 
   constructor(moves: Move[]) {
-    for (const m of moves) this.place(m.y * N + m.x, sideCode(m.side));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const m of moves) {
+      minX = Math.min(minX, m.x);
+      maxX = Math.max(maxX, m.x);
+      minY = Math.min(minY, m.y);
+      maxY = Math.max(maxY, m.y);
+    }
+    this.x0 = Math.max(BOARD_MIN, minX - WINDOW_MARGIN);
+    this.y0 = Math.max(BOARD_MIN, minY - WINDOW_MARGIN);
+    this.w = Math.min(BOARD_MAX, maxX + WINDOW_MARGIN) - this.x0 + 1;
+    this.h = Math.min(BOARD_MAX, maxY + WINDOW_MARGIN) - this.y0 + 1;
+    this.b = new Int8Array(this.w * this.h);
+    this.near = new Int16Array(this.w * this.h);
+    this.score = new Float64Array(this.w * this.h);
+    for (const m of moves) this.place(this.idx(m.x, m.y), sideCode(m.side));
+  }
+
+  idx(x: number, y: number): number {
+    return (y - this.y0) * this.w + (x - this.x0);
+  }
+
+  toCell(idx: number): Cell {
+    const lx = idx % this.w;
+    return { x: this.x0 + lx, y: this.y0 + (idx - lx) / this.w };
   }
 
   place(idx: number, side: number) {
@@ -167,10 +211,16 @@ class Engine {
   }
 
   private bumpNear(idx: number, delta: number) {
-    const x0 = idx % N;
-    const y0 = (idx - x0) / N;
-    for (let y = Math.max(0, y0 - 2); y <= Math.min(N - 1, y0 + 2); y++)
-      for (let x = Math.max(0, x0 - 2); x <= Math.min(N - 1, x0 + 2); x++) this.near[y * N + x] += delta;
+    const { w, h, near, cand } = this;
+    const x0 = idx % w;
+    const y0 = (idx - x0) / w;
+    for (let y = Math.max(0, y0 - 2); y <= Math.min(h - 1, y0 + 2); y++)
+      for (let x = Math.max(0, x0 - 2); x <= Math.min(w - 1, x0 + 2); x++) {
+        const i = y * w + x;
+        near[i] += delta;
+        if (near[i] === 0) cand.delete(i);
+        else if (delta > 0 && near[i] === delta) cand.add(i);
+      }
   }
 
   /** Scores every candidate for side `me` and collects threat squares. */
@@ -185,16 +235,17 @@ class Engine {
       myFour: [] as number[],
       attackSum: 0,
       defendSum: 0,
-      score: scoreBuf,
+      score: this.score,
     };
-    const b = this.b;
-    for (let idx = 0; idx < N * N; idx++) {
-      if (b[idx] !== EMPTY || this.near[idx] === 0) continue;
-      const x = idx % N;
-      const y = (idx - x) / N;
-      const a = cellScore(b, x, y, me);
+    const { b, w } = this;
+    const scoreBuf = this.score;
+    for (const idx of this.cand) {
+      if (b[idx] !== EMPTY) continue;
+      const x = idx % w;
+      const y = (idx - x) / w;
+      const a = cellScore(this, x, y, me);
       const myFours = lastFours;
-      const d = cellScore(b, x, y, opp);
+      const d = cellScore(this, x, y, opp);
       if (a >= W_FIVE) g.myFive.push(idx);
       else if (a >= W_OPEN4) g.myOpen4.push(idx);
       if (myFours > 0) g.myFour.push(idx);
@@ -209,8 +260,6 @@ class Engine {
     return g;
   }
 }
-
-const scoreBuf = new Float64Array(N * N);
 
 // ---- search --------------------------------------------------------------------------------
 const WIN = 1e12;
@@ -305,20 +354,30 @@ function pick(cells: number[], score: Float64Array, rng?: () => number): number 
   return top[Math.floor(rng() * top.length) % top.length];
 }
 
-const toCell = (idx: number): Cell => ({ x: idx % N, y: Math.floor(idx / N) });
+/** Nearest empty board cell to (0,0) (ring by ring); only used when no candidate exists. */
+function firstEmpty(moves: Move[]): Cell {
+  const taken = new Set(moves.map((m) => `${m.x},${m.y}`));
+  const reach = Math.max(-BOARD_MIN, BOARD_MAX);
+  for (let r = 0; r <= reach; r++)
+    for (let y = -r; y <= r; y++)
+      for (let x = -r; x <= r; x++) {
+        if (Math.max(Math.abs(x), Math.abs(y)) !== r) continue;
+        if (x < BOARD_MIN || y < BOARD_MIN || x > BOARD_MAX || y > BOARD_MAX) continue;
+        if (!taken.has(`${x},${y}`)) return { x, y };
+      }
+  return { x: 0, y: 0 }; // board full: unreachable in play (bot-vs-bot games are capped)
+}
 
 export function chooseBotMove(moves: Move[], side: Side, opts: BotOptions): Cell {
-  if (moves.length === 0) return { x: CENTER, y: CENTER };
+  if (moves.length === 0) return { x: 0, y: 0 };
   const e = new Engine(moves);
+  const toCell = (idx: number) => e.toCell(idx);
   const me = sideCode(side);
   const g = e.gen(me);
   const s = Float64Array.from(g.score); // copy: nested searches reuse the shared buffer
 
-  if (g.cells.length === 0) {
-    // No stone neighbourhood free (practically impossible): first empty square.
-    const idx = e.b.indexOf(EMPTY);
-    return toCell(idx >= 0 ? idx : 0);
-  }
+  // No stone neighbourhood free (practically impossible on a 100×100 board).
+  if (g.cells.length === 0) return firstEmpty(moves);
   // Pre-checks: win now, block a win, make an open four, block an open four (fast).
   if (g.myFive.length > 0) return toCell(pick(g.myFive, s, opts.rng));
   if (g.oppFive.length > 0) return toCell(pick(g.oppFive, s, opts.rng));

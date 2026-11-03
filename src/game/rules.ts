@@ -1,14 +1,29 @@
-import { BOARD_SIZE, type Cell, type Move, type Side } from './types';
-
-type Board = (Side | null)[][];
+import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from './types';
 
 export function isInside(x: number, y: number): boolean {
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < BOARD_SIZE && y < BOARD_SIZE;
+  return Number.isInteger(x) && Number.isInteger(y) && x >= BOARD_MIN && y >= BOARD_MIN && x <= BOARD_MAX && y <= BOARD_MAX;
+}
+
+/** Sparse board: only occupied cells are stored. */
+export class Board {
+  private cells = new Map<string, Side>();
+
+  get(x: number, y: number): Side | null {
+    return this.cells.get(`${x},${y}`) ?? null;
+  }
+
+  set(x: number, y: number, side: Side): void {
+    this.cells.set(`${x},${y}`, side);
+  }
+
+  get size(): number {
+    return this.cells.size;
+  }
 }
 
 export function buildBoard(moves: Move[]): Board {
-  const board: Board = Array.from({ length: BOARD_SIZE }, () => Array<Side | null>(BOARD_SIZE).fill(null));
-  for (const m of moves) board[m.y][m.x] = m.side;
+  const board = new Board();
+  for (const m of moves) board.set(m.x, m.y, m.side);
   return board;
 }
 
@@ -25,18 +40,23 @@ const DIRECTIONS: [number, number][] = [
 
 export function findWin(board: Board, last: Move): Cell[] | null {
   const { side } = last;
-  const blocked = (x: number, y: number) => !isInside(x, y) || (board[y][x] !== null && board[y][x] !== side);
+  const own = (x: number, y: number) => isInside(x, y) && board.get(x, y) === side;
+  const blocked = (x: number, y: number) => {
+    if (!isInside(x, y)) return true;
+    const v = board.get(x, y);
+    return v !== null && v !== side;
+  };
   for (const [dx, dy] of DIRECTIONS) {
     let x0 = last.x;
     let y0 = last.y;
-    while (isInside(x0 - dx, y0 - dy) && board[y0 - dy][x0 - dx] === side) {
+    while (own(x0 - dx, y0 - dy)) {
       x0 -= dx;
       y0 -= dy;
     }
     const chain: Cell[] = [];
     let x = x0;
     let y = y0;
-    while (isInside(x, y) && board[y][x] === side) {
+    while (own(x, y)) {
       chain.push({ x, y });
       x += dx;
       y += dy;

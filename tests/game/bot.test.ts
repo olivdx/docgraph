@@ -24,17 +24,17 @@ function mulberry32(seed: number): () => number {
 
 /** Uniformly random empty cell adjacent (Chebyshev 1) to any stone; center on an empty board. */
 function randomMove(moves: Move[], rng: () => number): Cell {
-  if (moves.length === 0) return { x: 15, y: 15 };
+  if (moves.length === 0) return { x: 0, y: 0 };
   const board = buildBoard(moves);
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const cells: Cell[] = [];
   for (const m of moves) {
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const x = m.x + dx;
         const y = m.y + dy;
-        if (!isInside(x, y) || board[y][x] !== null || seen.has(y * 100 + x)) continue;
-        seen.add(y * 100 + x);
+        if (!isInside(x, y) || board.get(x, y) !== null || seen.has(`${x},${y}`)) continue;
+        seen.add(`${x},${y}`);
         cells.push({ x, y });
       }
     }
@@ -51,10 +51,10 @@ function playGame(px: Player, po: Player, maxMoves = 400): Side | null {
     const side: Side = i % 2 === 0 ? 'X' : 'O';
     const c = (side === 'X' ? px : po)(moves, side);
     const board = buildBoard(moves);
-    if (!isInside(c.x, c.y) || board[c.y][c.x] !== null) throw new Error(`illegal move ${c.x},${c.y} by ${side}`);
+    if (!isInside(c.x, c.y) || board.get(c.x, c.y) !== null) throw new Error(`illegal move ${c.x},${c.y} by ${side}`);
     const m = mv(c.x, c.y, side);
     moves.push(m);
-    board[c.y][c.x] = side;
+    board.set(c.x, c.y, side);
     if (findWin(board, m)) return side;
   }
   return null;
@@ -63,46 +63,74 @@ function playGame(px: Player, po: Player, maxMoves = 400): Side | null {
 const inSet = (c: Cell, set: Cell[]) => set.some((s) => s.x === c.x && s.y === c.y);
 
 describe('chooseBotMove', () => {
-  it('empty board → center', () => {
-    expect(chooseBotMove([], 'X', { mode: 'full' })).toEqual({ x: 15, y: 15 });
-    expect(chooseBotMove([], 'X', { mode: 'fast' })).toEqual({ x: 15, y: 15 });
+  it('empty board → (0,0)', () => {
+    expect(chooseBotMove([], 'X', { mode: 'full' })).toEqual({ x: 0, y: 0 });
+    expect(chooseBotMove([], 'X', { mode: 'fast' })).toEqual({ x: 0, y: 0 });
   });
 
   it('takes immediate open win', () => {
-    const moves = [mv(5, 5, 'X'), mv(20, 20, 'X'), mv(5, 20, 'X'), mv(20, 5, 'X'), mv(25, 25, 'X'), ...row(10, 13, 10, 'O')];
+    const moves = [mv(-10, -10, 'X'), mv(5, 5, 'X'), mv(-10, 5, 'X'), mv(5, -10, 'X'), mv(10, 10, 'X'), ...row(-5, -2, -5, 'O')];
     for (const mode of ['full', 'fast'] as const) {
-      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: 9, y: 10 }, { x: 14, y: 10 }])).toBe(true);
+      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: -6, y: -5 }, { x: -1, y: -5 }])).toBe(true);
     }
   });
 
   it('does not "win" into a both-blocked five', () => {
-    // (14,5) would make O(10..14,5) with X on both ends — not a win. (14,12) is a real win.
-    const moves = [mv(9, 5, 'X'), ...row(10, 13, 5, 'O'), mv(15, 5, 'X'), mv(9, 12, 'X'), ...row(10, 13, 12, 'O'), mv(20, 20, 'X'), mv(22, 22, 'X'), mv(24, 20, 'X'), mv(3, 25, 'X')];
+    // (-1,-10) would make O(-5..-1,-10) with X on both ends — not a win. (-1,-3) is a real win.
+    const moves = [mv(-6, -10, 'X'), ...row(-5, -2, -10, 'O'), mv(0, -10, 'X'), mv(-6, -3, 'X'), ...row(-5, -2, -3, 'O'), mv(5, 5, 'X'), mv(7, 7, 'X'), mv(9, 5, 'X'), mv(-12, 10, 'X')];
     for (const mode of ['full', 'fast'] as const) {
-      expect(chooseBotMove(moves, 'O', { mode })).toEqual({ x: 14, y: 12 });
+      expect(chooseBotMove(moves, 'O', { mode })).toEqual({ x: -1, y: -3 });
     }
   });
 
   it('blocks opponent four', () => {
-    const moves = [...row(5, 8, 5, 'X'), mv(20, 20, 'O'), mv(22, 23, 'O'), mv(18, 25, 'O')];
+    const moves = [...row(-10, -7, -10, 'X'), mv(5, 5, 'O'), mv(7, 8, 'O'), mv(3, 10, 'O')];
     for (const mode of ['full', 'fast'] as const) {
-      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: 4, y: 5 }, { x: 9, y: 5 }])).toBe(true);
+      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: -11, y: -10 }, { x: -6, y: -10 }])).toBe(true);
     }
   });
 
   it('blocks open three', () => {
-    const moves = [...row(5, 7, 5, 'X'), mv(20, 20, 'O'), mv(23, 22, 'O')];
+    const moves = [...row(-10, -8, -10, 'X'), mv(5, 5, 'O'), mv(8, 7, 'O')];
     for (const mode of ['full', 'fast'] as const) {
-      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: 4, y: 5 }, { x: 8, y: 5 }])).toBe(true);
+      expect(inSet(chooseBotMove(moves, 'O', { mode }), [{ x: -11, y: -10 }, { x: -7, y: -10 }])).toBe(true);
     }
   });
 
   it('never returns an occupied or outside cell (corner pressure)', () => {
-    const moves = [mv(0, 0, 'X'), mv(1, 0, 'O'), mv(0, 1, 'X'), mv(1, 1, 'O'), mv(29, 29, 'X'), mv(28, 29, 'O')];
+    const moves = [mv(-50, -50, 'X'), mv(-49, -50, 'O'), mv(-50, -49, 'X'), mv(-49, -49, 'O'), mv(49, 49, 'X'), mv(48, 49, 'O')];
     for (const mode of ['full', 'fast'] as const) {
       const c = chooseBotMove(moves, 'X', { mode });
       expect(isInside(c.x, c.y)).toBe(true);
-      expect(buildBoard(moves)[c.y][c.x]).toBeNull();
+      expect(buildBoard(moves).get(c.x, c.y)).toBeNull();
+    }
+  });
+
+  it('no phantom edge at the old 30×30 boundary: a five ending at x = 30..34 is open', () => {
+    // X four 30..33 closed by O at 29: (34,0) wins only if (35,0) is empty, not an edge.
+    const right = [mv(29, 0, 'O'), ...row(30, 33, 0, 'X'), mv(0, 0, 'O'), mv(-5, 8, 'O'), mv(5, -8, 'O')];
+    // X four -4..-1 closed by O at 0: (-5,5) wins only if (-6,5) is empty.
+    const left = [mv(0, 5, 'O'), ...row(-4, -1, 5, 'X'), mv(20, 20, 'O'), mv(-20, 20, 'O'), mv(20, -20, 'O')];
+    for (const mode of ['full', 'fast'] as const) {
+      expect(chooseBotMove(right, 'X', { mode })).toEqual({ x: 34, y: 0 });
+      expect(chooseBotMove(left, 'X', { mode })).toEqual({ x: -5, y: 5 });
+      // ...and as O the bot must block those same squares.
+      expect(chooseBotMove(right, 'O', { mode })).toEqual({ x: 34, y: 0 });
+      expect(chooseBotMove(left, 'O', { mode })).toEqual({ x: -5, y: 5 });
+    }
+  });
+
+  it('the real board edge (-50 / 49) blocks: no "win" into edge + opponent', () => {
+    // O at (-50,-20) would make O(-50..-46,-20): edge on the left, X at (-45,-20) → not a win.
+    // O at (49,20) would make O(45..49,20): X at (44,20), edge on the right → not a win. (4,0) is real.
+    const moves = [
+      ...row(-49, -46, -20, 'O'), mv(-45, -20, 'X'),
+      mv(44, 20, 'X'), ...row(45, 48, 20, 'O'),
+      mv(-1, 0, 'X'), ...row(0, 3, 0, 'O'),
+      mv(10, 10, 'X'), mv(-10, 10, 'X'), mv(10, -10, 'X'), mv(-10, -10, 'X'), mv(12, -12, 'X'),
+    ];
+    for (const mode of ['full', 'fast'] as const) {
+      expect(chooseBotMove(moves, 'O', { mode })).toEqual({ x: 4, y: 0 });
     }
   });
 
@@ -151,7 +179,7 @@ describe('chooseBotMove', () => {
     const t0 = performance.now();
     const c = chooseBotMove(moves, 'X', { mode: 'full' });
     const dt = performance.now() - t0;
-    expect(buildBoard(moves)[c.y][c.x]).toBeNull();
+    expect(buildBoard(moves).get(c.x, c.y)).toBeNull();
     expect(dt).toBeLessThan(400);
   });
 
@@ -161,7 +189,7 @@ describe('chooseBotMove', () => {
     const t0 = performance.now();
     const c = chooseBotMove(moves, 'X', { mode: 'fast', rng: mulberry32(2) });
     const dt = performance.now() - t0;
-    expect(buildBoard(moves)[c.y][c.x]).toBeNull();
+    expect(buildBoard(moves).get(c.x, c.y)).toBeNull();
     expect(dt).toBeLessThan(20);
   });
 });
