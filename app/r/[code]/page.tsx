@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { ApiError, apiPost } from '@/src/client/api'
+import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import type { BracketMatchView, Entrant, RoomView } from '@/src/tournament/views'
@@ -37,6 +37,22 @@ function Room() {
 
   // Prefer whichever is fresher: the last poll or the last action response.
   const view = override && (!room || override.serverNow > room.serverNow) ? override : room
+
+  // ?join=1 (ref link): if you're already active in a different room (lobby or running), say so up
+  // front, whatever this room's status is; the join below would be refused anyway.
+  useEffect(() => {
+    if (!wantsJoin) return
+    let live = true
+    apiGet<{ active: { code: string } | null }>('/api/me')
+      .then((me) => {
+        const other = me.active?.code
+        if (live && other && other.toUpperCase() !== code.toUpperCase()) setBlockedBy(other)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [wantsJoin, code])
 
   // ?join=1 (ref link): join once while the room is still in the lobby. Joining is idempotent server-side,
   // so a member re-opening the link is harmless.
