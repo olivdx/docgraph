@@ -3,7 +3,7 @@ import { MongoClient, type Db } from 'mongodb'
 import type { MongoMemoryServer } from 'mongodb-memory-server'
 import { ensureIndexes } from '@/src/server/db'
 import { MongoPresenceStore, MongoRoomStore } from '@/src/server/stores'
-import { createRoom, joinRoom } from '@/src/tournament/room'
+import { createRoom, joinRoom, startRoom } from '@/src/tournament/room'
 import type { Room } from '@/src/tournament/types'
 
 /**
@@ -77,6 +77,20 @@ describe('Mongo stores', () => {
     const list = await rooms.listOpen(10)
     expect(list.map((r) => r._id)).toEqual(['RUN001', 'OPEN01'])
     expect((await rooms.listOpen(1)).map((r) => r._id)).toEqual(['RUN001'])
+  })
+
+  it('listOpen projects out matches.moves', async (ctx) => {
+    if (!db) return ctx.skip()
+    await db.collection('rooms').deleteMany({})
+    const rooms = new MongoRoomStore(db)
+    const r = startRoom(joinRoom(room('MOV001', 1), host(2), T0), 'u1', T0 + 1, () => 0.3)
+    r.matches[0].moves.push({ x: 1, y: 1, side: 'X', at: T0 + 2 })
+    await rooms.insert(r)
+    const [listed] = await rooms.listOpen(10)
+    expect(listed.matches).toHaveLength(1)
+    expect(listed.matches[0].status).toBe('pending')
+    expect('moves' in listed.matches[0]).toBe(false)
+    expect((await rooms.get('MOV001'))!.matches[0].moves).toHaveLength(1)
   })
 
   it('findByPlayer works', async (ctx) => {

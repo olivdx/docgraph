@@ -51,6 +51,9 @@ export interface Room {
   expiresAt: Date
 }
 
+/** A room as listed for summaries: `matches[].moves` is projected out (never needed there). */
+export type ListedRoom = Omit<Room, 'matches'> & { matches: Omit<Match, 'moves'>[] }
+
 export type RoomErrorCode =
   | 'not_found' | 'not_lobby' | 'full' | 'not_host' | 'host_must_cancel' | 'too_few_players'
   | 'not_participant' | 'not_playing' | 'not_your_turn' | 'occupied' | 'out_of_bounds' | 'already_active' | 'conflict'

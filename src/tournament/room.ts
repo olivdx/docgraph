@@ -4,7 +4,7 @@ import { planBracket } from './bracket'
 import { randomCode } from './codes'
 import { FINISHED_TTL_MS, LOBBY_TTL_MS, MATCH_ID_LEN, MAX_PLAYERS, MIN_HUMANS } from './constants'
 import { applyMove, finishMatch, opposite, promoteIfReady, stepMatch, type Presence, type SettleOpts } from './match'
-import { RoomError, type Match, type Player, type Room } from './types'
+import { RoomError, type ListedRoom, type Match, type Player, type Room } from './types'
 
 /**
  * Room aggregate. Every exported function is pure: it never mutates its input and returns a new
@@ -277,7 +277,7 @@ export function resign(
 
 // ---- queries -----------------------------------------------------------------------------------
 
-export function isActive(room: Room, userId: string): boolean {
+export function isActive(room: ListedRoom, userId: string): boolean {
   if (!room.players.some((p) => p.userId === userId)) return false
   if (room.status === 'lobby') return true
   if (room.status !== 'running') return false

@@ -397,6 +397,39 @@ describe('RoomService', () => {
     expect(store.replaces).toBe(1)
   })
 
+  it('list works without moves (the store strips them) and presence is read only for playing matches', async () => {
+    class CountingPresence extends MemoryPresenceStore {
+      gets = 0
+      override async get(code: string, ids: string[]) {
+        this.gets++
+        return super.get(code, ids)
+      }
+    }
+    const rooms = new MemoryRoomStore()
+    const clock = { t: T0 }
+    const presence = new CountingPresence()
+    const svc = new RoomService({ rooms, presence, now: () => clock.t, rng: mulberry(7), inviteUrl: () => '' })
+    const view = await svc.create(tg(1), 'Cup')
+    await svc.join(view.code, tg(2))
+    await svc.start(view.code, tg(1))
+    const m = (await rooms.get(view.code))!.matches[0]
+    await svc.getRoom(view.code, tg(1))
+    await svc.getMatch(view.code, m.id, tg(1)) // pending → no presence read
+    await svc.me(tg(1))
+    expect(presence.gets).toBe(0)
+    await svc.getMatch(view.code, m.id, tg(2)) // both ready → playing (settled inside the command)
+    await svc.getMatch(view.code, m.id, tg(1))
+    expect(presence.gets).toBe(1)
+
+    const X = tg(Number(m.X!.slice(1)))
+    clock.t += 1000
+    await svc.move(view.code, m.id, X, { x: 3, y: 3 }, 0)
+    const listedRaw = await rooms.listOpen(10)
+    expect('moves' in listedRaw[0].matches[0]).toBe(false)
+    const [summary] = await svc.list(tg(1))
+    expect(summary).toMatchObject({ code: view.code, status: 'running', youAreIn: true, liveLabel: 'Final live' })
+  })
+
   it('list returns open-room summaries', async () => {
     const ctx = setup()
     const { svc, clock } = ctx

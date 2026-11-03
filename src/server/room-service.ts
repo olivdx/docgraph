@@ -174,8 +174,13 @@ export class RoomService {
     }
   }
 
-  /** Last-seen times for the players of every playing match (plus the extra match, if given). */
-  private readPresence(room: Room, extraMatchId?: string): Promise<Presence> {
+  /**
+   * Last-seen times for the players of every playing match (plus the extra match, if given).
+   * No playing match → no read at all: presence only matters for playing matches (a match that
+   * starts inside this request starts now, so its disconnect deadline cannot be due yet).
+   */
+  private async readPresence(room: Room, extraMatchId?: string): Promise<Presence> {
+    if (!room.matches.some((m) => m.status === 'playing')) return {}
     const ids = new Set<string>()
     for (const m of room.matches) {
       if (m.status !== 'playing' && m.id !== extraMatchId) continue
@@ -183,6 +188,7 @@ export class RoomService {
         if (id && !room.players.find((p) => p.userId === id)?.isBot) ids.add(id)
       }
     }
+    if (ids.size === 0) return {}
     return this.deps.presence.get(room._id, [...ids])
   }
 

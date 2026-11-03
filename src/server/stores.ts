@@ -1,5 +1,5 @@
 import type { Collection, Db } from 'mongodb'
-import type { Room } from '@/src/tournament/types'
+import type { ListedRoom, Room } from '@/src/tournament/types'
 
 export interface RoomStore {
   get(code: string): Promise<Room | null>
@@ -7,8 +7,8 @@ export interface RoomStore {
   insert(room: Room): Promise<boolean>
   /** CAS on version: succeeds only if the stored version === expectedVersion; stores version = expectedVersion + 1. */
   replace(room: Room, expectedVersion: number): Promise<boolean>
-  /** status lobby|running, newest first */
-  listOpen(limit: number): Promise<Room[]>
+  /** status lobby|running, newest first; `matches[].moves` is omitted (summaries never need it) */
+  listOpen(limit: number): Promise<ListedRoom[]>
   /** status lobby|running containing userId */
   findByPlayer(userId: string): Promise<Room[]>
 }
@@ -44,12 +44,16 @@ export class MemoryRoomStore implements RoomStore {
     return true
   }
 
-  async listOpen(limit: number): Promise<Room[]> {
+  async listOpen(limit: number): Promise<ListedRoom[]> {
     return [...this.rooms.values()]
       .filter((r) => OPEN.includes(r.status))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit)
-      .map((r) => structuredClone(r))
+      .map((r) => {
+        const { matches, ...rest } = structuredClone(r)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        return { ...rest, matches: matches.map(({ moves, ...m }) => m) }
+      })
   }
 
   async findByPlayer(userId: string): Promise<Room[]> {
@@ -112,8 +116,12 @@ export class MongoRoomStore implements RoomStore {
     return res.matchedCount === 1
   }
 
-  async listOpen(limit: number): Promise<Room[]> {
-    return this.col.find({ status: { $in: OPEN } }).sort({ createdAt: -1 }).limit(limit).toArray()
+  async listOpen(limit: number): Promise<ListedRoom[]> {
+    return this.col
+      .find<ListedRoom>({ status: { $in: OPEN } }, { projection: { 'matches.moves': 0 } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray()
   }
 
   async findByPlayer(userId: string): Promise<Room[]> {

@@ -4,7 +4,7 @@ import { roundName } from './bracket'
 import { DISCONNECT_DETECT_MS, NO_SHOW_MS, RECONNECT_GRACE_MS } from './constants'
 import { isBotId, opposite, sideOf, type Presence } from './match'
 import { isActive } from './room'
-import { RoomError, type EndReason, type Match, type MatchStatus, type Room, type RoomStatus } from './types'
+import { RoomError, type EndReason, type ListedRoom, type Match, type MatchStatus, type Room, type RoomStatus } from './types'
 
 export interface Entrant {
   name: string
@@ -70,7 +70,7 @@ export interface MatchView {
   serverNow: number
 }
 
-function nameOf(room: Room, userId: string | null): string {
+function nameOf(room: Pick<Room, 'players'>, userId: string | null): string {
   return room.players.find((p) => p.userId === userId)?.name ?? '?'
 }
 
@@ -79,7 +79,8 @@ function entrant(room: Room, userId: string | null): Entrant | null {
   return p ? { name: p.name, seed: p.seed, isBot: p.isBot } : null
 }
 
-export function toRoomSummary(room: Room, viewerId: string): RoomSummary {
+/** Works on a full Room or a listed one (no moves). */
+export function toRoomSummary(room: ListedRoom, viewerId: string): RoomSummary {
   let liveLabel: string | null = null
   if (room.status === 'running') {
     const open = room.matches.filter((m) => m.kind === 'normal' && m.status !== 'finished')

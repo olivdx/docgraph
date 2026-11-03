@@ -12,6 +12,10 @@ It is for fun, not ranking: there is no ELO, and all tournament data is deleted 
 - Identity is the Telegram `initData`, verified server-side with the bot token. No cookies or sessions.
 - Design spec: `docs/superpowers/specs/2026-11-02-caro-tournament-design.md`.
 
+## Limits
+
+Caro Cup is designed for small friend groups. Every open client polls the server (about once a second during a match), and each poll reads, and sometimes writes, the room document. A handful of concurrent tournaments is fine on free tiers, but near the 32-player bound on MongoDB Atlas M0 and Vercel Hobby expect throttling (slower responses, occasional retries) from the free-tier operation and connection limits.
+
 ## Environment variables
 
 Copy `.env.example` to `.env.local` and fill it in. Never commit real credentials.
