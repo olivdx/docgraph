@@ -39,12 +39,15 @@ const LIST_LIMIT = 50
 
 type Presence = Record<string, number>
 /**
- * `settled` is the room after settleRoom; `loaded` is the room as read. Room-level commands use
- * `settled`; match commands use `loaded` (they settle internally with the same presence, which
- * keeps room.ts's late-move / late-resign contract: a deadline that expired before the command
- * returns the settled result instead of not_playing).
+ * `loaded` is the room as read; `settled()` lazily settles it (computed at most once per attempt).
+ * Room-level commands use `settled()`; match commands use `loaded` (they settle internally with the
+ * same presence and bot scope, which keeps room.ts's late-move / late-resign contract: a deadline
+ * that expired before the command returns the settled result instead of not_playing). Match
+ * commands therefore never pay for a second settle (and a second full-strength bot search).
  */
-type Command = (settled: Room, presence: Presence, now: number, loaded: Room) => Room
+type Command = (loaded: Room, presence: Presence, now: number, settled: () => Room) => Room
+/** Room-level requests never run a full-strength bot search for a fresh human-vs-bot move. */
+const ROOM_SCOPE = { fullBotMatchId: null }
 interface Mutated {
   room: Room
   presence: Presence
@@ -67,7 +70,7 @@ export class RoomService {
     const now = this.deps.now()
     for (const loaded of await this.deps.rooms.findByPlayer(user.id)) {
       const presence = await this.readPresence(loaded)
-      const { room } = settleRoom(loaded, presence, now, this.deps.rng)
+      const { room } = settleRoom(loaded, presence, now, this.deps.rng, ROOM_SCOPE)
       if (!isActive(room, user.id)) continue
       const m = room.matches.find(
         (x) => (x.a === user.id || x.b === user.id) && (x.status === 'pending' || x.status === 'playing'),
@@ -96,28 +99,28 @@ export class RoomService {
   }
 
   async getRoom(code: string, user: TelegramUser): Promise<RoomView> {
-    const { room, now } = await this.mutate(code, (r) => r)
+    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => settled())
     return this.roomView(room, user, now)
   }
 
   async join(code: string, user: TelegramUser): Promise<RoomView> {
     await this.assertNotActiveElsewhere(user.id, code)
-    const { room, now } = await this.mutate(code, (r, _p, t) => joinRoom(r, userInfo(user), t))
+    const { room, now } = await this.mutate(code, (_l, _p, t, settled) => joinRoom(settled(), userInfo(user), t))
     return this.roomView(room, user, now)
   }
 
   async leave(code: string, user: TelegramUser): Promise<RoomView> {
-    const { room, now } = await this.mutate(code, (r) => leaveRoom(r, user.id))
+    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => leaveRoom(settled(), user.id))
     return this.roomView(room, user, now)
   }
 
   async cancel(code: string, user: TelegramUser): Promise<RoomView> {
-    const { room, now } = await this.mutate(code, (r, _p, t) => cancelRoom(r, user.id, t))
+    const { room, now } = await this.mutate(code, (_l, _p, t, settled) => cancelRoom(settled(), user.id, t))
     return this.roomView(room, user, now)
   }
 
   async start(code: string, user: TelegramUser): Promise<RoomView> {
-    const { room, now } = await this.mutate(code, (r, _p, t) => startRoom(r, user.id, t, this.deps.rng))
+    const { room, now } = await this.mutate(code, (_l, _p, t, settled) => startRoom(settled(), user.id, t, this.deps.rng))
     return this.roomView(room, user, now)
   }
 
@@ -126,8 +129,10 @@ export class RoomService {
   async getMatch(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (settled, p, t, loaded) =>
-        isParticipant(loaded, matchId, user.id) ? markReady(loaded, matchId, user.id, t, this.deps.rng, p) : settled,
+      (loaded, p, t, settled) =>
+        isParticipant(loaded, matchId, user.id)
+          ? markReady(loaded, matchId, user.id, t, this.deps.rng, p, { fullBotMatchId: matchId })
+          : settled(),
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -136,7 +141,8 @@ export class RoomService {
   async move(code: string, matchId: string, user: TelegramUser, cell: Cell, clientMoveNo: number): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (_s, p, t, loaded) => playMove(loaded, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p),
+      (loaded, p, t) =>
+        playMove(loaded, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p, { fullBotMatchId: matchId }),
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -145,7 +151,7 @@ export class RoomService {
   async resign(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
     const res = await this.mutate(
       code,
-      (_s, p, t, loaded) => resignCmd(loaded, matchId, user.id, t, this.deps.rng, p),
+      (loaded, p, t) => resignCmd(loaded, matchId, user.id, t, this.deps.rng, p, { fullBotMatchId: matchId }),
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
@@ -163,7 +169,7 @@ export class RoomService {
     for (const loaded of await this.deps.rooms.findByPlayer(userId)) {
       if (loaded._id === exceptCode) continue
       const presence = await this.readPresence(loaded)
-      const { room } = settleRoom(loaded, presence, now, this.deps.rng)
+      const { room } = settleRoom(loaded, presence, now, this.deps.rng, ROOM_SCOPE)
       if (isActive(room, userId)) throw new RoomError('already_active', { activeCode: room._id })
     }
   }
@@ -181,10 +187,11 @@ export class RoomService {
   }
 
   /**
-   * get → (touch caller) → read presence → settle → command → write only if changed (CAS on
-   * version); retried from a fresh read on CAS failure, up to MAX_ATTEMPTS. If the command throws
-   * a RoomError after a state-changing settle, the settled room is still persisted (same CAS
-   * rules) and then the original error is rethrown.
+   * get → (touch caller) → read presence → command (settling as it needs) → write only if changed
+   * (CAS on version); retried from a fresh read on CAS failure, up to MAX_ATTEMPTS. If the command
+   * throws a RoomError and settling alone changes the room, the settled room is still persisted
+   * (same CAS rules) and then the original error is rethrown. Full-strength bot moves are scoped to
+   * the caller's match (match requests) or to none (room requests); see SettleOpts.
    */
   private async mutate(code: string, command: Command, caller?: { matchId: string; userId: string }): Promise<Mutated> {
     let touched = false
@@ -197,16 +204,21 @@ export class RoomService {
         touched = true
       }
       const presence = await this.readPresence(loaded, caller?.matchId)
-      const settled = settleRoom(loaded, presence, now, this.deps.rng)
+      const opts = { fullBotMatchId: caller?.matchId ?? null }
+      let cached: { room: Room; changed: boolean } | null = null
+      const settle = () => (cached ??= settleRoom(loaded, presence, now, this.deps.rng, opts))
       let next: Room
       try {
-        next = command(settled.room, presence, now, loaded)
+        next = command(loaded, presence, now, () => settle().room)
       } catch (e) {
-        if (!(e instanceof RoomError) || !settled.changed) throw e
+        if (!(e instanceof RoomError)) throw e
+        const settled = settle()
+        if (!settled.changed) throw e
         if (await this.write(settled.room, loaded.version, now)) throw e
         continue // CAS lost: re-read and retry
       }
-      if (!settled.changed && JSON.stringify(next) === JSON.stringify(loaded)) {
+      // settling changes the room whenever it reports `changed`, so equality means "nothing to write"
+      if (JSON.stringify(next) === JSON.stringify(loaded)) {
         return { room: loaded, presence, now }
       }
       const saved = await this.write(next, loaded.version, now)

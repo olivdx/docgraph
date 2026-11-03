@@ -9,6 +9,11 @@ export const FINISHED_TTL_MS = 10 * 60 * 1000
 export const BOT_DELAY_MIN_MS = 500
 export const BOT_DELAY_MAX_MS = 1000
 export const BOT_TIME_BUDGET_MS = 250
+/**
+ * Out-of-scope settles leave a due full-strength bot move to its own match's poller, but only for
+ * this long: after that the human evidently stopped polling and any settle plays it (no stall).
+ */
+export const BOT_DEFER_MAX_MS = 5_000
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const ROOM_CODE_LEN = 6
 export const MATCH_ID_LEN = 4

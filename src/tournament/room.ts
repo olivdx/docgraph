@@ -3,7 +3,7 @@ import type { Cell } from '@/src/game/types'
 import { planBracket } from './bracket'
 import { randomCode } from './codes'
 import { FINISHED_TTL_MS, LOBBY_TTL_MS, MATCH_ID_LEN, MAX_PLAYERS, MIN_HUMANS } from './constants'
-import { applyMove, finishMatch, opposite, promoteIfReady, stepMatch, type Presence } from './match'
+import { applyMove, finishMatch, opposite, promoteIfReady, stepMatch, type Presence, type SettleOpts } from './match'
 import { RoomError, type Match, type Player, type Room } from './types'
 
 /**
@@ -12,7 +12,8 @@ import { RoomError, type Match, type Player, type Room } from './types'
  *
  * playMove / resign / markReady settle the room first. They accept an optional trailing
  * `presence` map; when it is omitted, disconnect deadlines are not evaluated by that call (the
- * service's settleRoom with real presence handles them).
+ * service's settleRoom with real presence handles them). A further optional `opts` (SettleOpts)
+ * scopes full-strength bot moves to one match (see match.ts).
  */
 
 type Rng = () => number
@@ -157,13 +158,13 @@ function finishRoomIfDone(r: Room, now: number): boolean {
 }
 
 /** Mutates `r` (a private clone) until no deadline ≤ now remains. Returns whether anything changed. */
-function settleInPlace(r: Room, presence: Presence, now: number, rng: Rng): boolean {
+function settleInPlace(r: Room, presence: Presence, now: number, rng: Rng, opts?: SettleOpts): boolean {
   if (r.status !== 'running') return false
   let changed = false
   for (;;) {
     let progress = false
     for (const m of r.matches) {
-      while (stepMatch(r, m, presence, now, rng)) progress = true
+      while (stepMatch(r, m, presence, now, rng, opts)) progress = true
     }
     if (!progress) break
     changed = true
@@ -177,10 +178,11 @@ export function settleRoom(
   presence: Record<string, number>,
   now: number,
   rng: Rng,
+  opts?: SettleOpts,
 ): { room: Room; changed: boolean } {
   if (room.status !== 'running') return { room, changed: false }
   const r = structuredClone(room)
-  const changed = settleInPlace(r, presence, now, rng)
+  const changed = settleInPlace(r, presence, now, rng, opts)
   return changed ? { room: r, changed } : { room, changed }
 }
 
@@ -204,15 +206,16 @@ export function markReady(
   now: number,
   rng: Rng,
   presence?: Record<string, number>,
+  opts?: SettleOpts,
 ): Room {
   const r = structuredClone(room)
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   const m = loadMatch(r, matchId, userId)
   if (m.status !== 'pending') return r
   const side = m.X === userId ? 'X' : 'O'
   if (m.readyAt[side] !== null) return r
   m.readyAt[side] = now
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   return r
 }
 
@@ -225,9 +228,10 @@ export function playMove(
   now: number,
   rng: Rng,
   presence?: Record<string, number>,
+  opts?: SettleOpts,
 ): Room {
   const r = structuredClone(room)
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   const m = loadMatch(r, matchId, userId)
   const side = m.X === userId ? 'X' : m.O === userId ? 'O' : null
 
@@ -245,7 +249,7 @@ export function playMove(
   if (m.moves.some((mv) => mv.x === cell.x && mv.y === cell.y)) throw new RoomError('occupied')
 
   applyMove(r, m, cell, side, now, rng)
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   return r
 }
 
@@ -256,9 +260,10 @@ export function resign(
   now: number,
   rng: Rng,
   presence?: Record<string, number>,
+  opts?: SettleOpts,
 ): Room {
   const r = structuredClone(room)
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   const m = loadMatch(r, matchId, userId)
   if (m.status !== 'playing') {
     if (m.status === 'finished' && wasPlaying(room, matchId)) return r
@@ -266,7 +271,7 @@ export function resign(
   }
   const side = m.X === userId ? 'X' : 'O'
   finishMatch(r, m, opposite(side), 'resign', now, rng)
-  settleInPlace(r, presence ?? null, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
   return r
 }
 

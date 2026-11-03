@@ -3,6 +3,7 @@ import { buildBoard, findWin, sideToMove } from '@/src/game/rules'
 import { BOARD_SIZE, type Cell, type Side } from '@/src/game/types'
 import {
   BOT_DELAY_MAX_MS,
+  BOT_DEFER_MAX_MS,
   BOT_DELAY_MIN_MS,
   BOT_TIME_BUDGET_MS,
   DISCONNECT_DETECT_MS,
@@ -22,6 +23,20 @@ import type { EndReason, Match, Room } from './types'
  * `presence === null` means "presence unknown": disconnect deadlines are not evaluated.
  */
 export type Presence = Record<string, number> | null
+
+/**
+ * Settle options. `fullBotMatchId` scopes full-strength bot searches (human-vs-bot moves):
+ * - omitted / undefined: every match's due bot move is played (no scope);
+ * - a match id: only that match's due bot move is played;
+ * - null: no match's (room-level request).
+ * An out-of-scope due bot move is left pending, and since it is that match's earliest due event the
+ * match is not stepped further either (chronological order holds). Once it has been due for more
+ * than BOT_DEFER_MAX_MS it is played regardless. Turn / disconnect / no-show deadlines, promotion
+ * and bot-vs-bot games are never scoped.
+ */
+export interface SettleOpts {
+  fullBotMatchId?: string | null
+}
 
 type Rng = () => number
 
@@ -177,7 +192,14 @@ type Due =
   | { at: number; kind: 'bot' }
 
 /** Applies at most one transition / event to the match. Returns true if something changed. */
-export function stepMatch(room: Room, m: Match, presence: Presence, now: number, rng: Rng): boolean {
+export function stepMatch(
+  room: Room,
+  m: Match,
+  presence: Presence,
+  now: number,
+  rng: Rng,
+  opts?: SettleOpts,
+): boolean {
   switch (m.status) {
     case 'waiting':
       return promoteIfReady(room, m, now, rng)
@@ -221,6 +243,8 @@ export function stepMatch(room: Room, m: Match, presence: Presence, now: number,
       } else if (ev.kind === 'disconnect') {
         finishMatch(room, m, opposite(ev.side), 'disconnect_timeout', ev.at, rng)
       } else {
+        const scope = opts?.fullBotMatchId
+        if (scope !== undefined && scope !== m.id && now - ev.at <= BOT_DEFER_MAX_MS) return false
         if (m.moves.length >= BOARD_CELLS) {
           finishMatch(room, m, 'X', 'board_full', ev.at, rng)
         } else {

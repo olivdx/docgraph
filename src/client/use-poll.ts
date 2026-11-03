@@ -21,18 +21,32 @@ export function usePoll<T>(path: string | null, intervalMs: number) {
     }
   }, [path])
 
+  // Completion-chained: the next request is scheduled only after the previous one settled, so a slow
+  // server never sees overlapping polls from one tab. Paused while hidden; refreshes on return.
   useEffect(() => {
     if (!path) return
-    const first = setTimeout(() => void load(), 0)
-    const tick = () => {
-      if (!document.hidden) void load()
+    let stopped = false
+    let running = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const run = async () => {
+      timer = null
+      if (stopped || running || document.hidden) return
+      running = true
+      await load()
+      running = false
+      if (!stopped) timer = setTimeout(() => void run(), intervalMs)
     }
-    const id = setInterval(tick, intervalMs)
-    document.addEventListener('visibilitychange', tick)
+    const onVis = () => {
+      if (document.hidden || running) return
+      if (timer) clearTimeout(timer)
+      void run()
+    }
+    timer = setTimeout(() => void run(), 0)
+    document.addEventListener('visibilitychange', onVis)
     return () => {
-      clearTimeout(first)
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', tick)
+      stopped = true
+      if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVis)
     }
   }, [path, intervalMs, load])
 

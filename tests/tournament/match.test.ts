@@ -287,6 +287,33 @@ describe('bracket progression', () => {
     expect(onTime.turnDeadlineAt).toBe(due + TURN_MS)
   })
 
+  it('bot scope: an out-of-scope due bot move is deferred, and so is everything after it in that match', () => {
+    let r = startedRoom(3, 5)
+    const m0 = r.matches.find((m) => isBot(r, m.a) || isBot(r, m.b))!
+    r = ready(r, m0)
+    r = playMove(r, m0.id, m0.X!, { x: 15, y: 15 }, 0, START + 1000, rng)
+    const due = byId(r, m0.id).botMoveDueAt!
+    byId(r, m0.id).startedAt = due - 60_000 // long-running game, so presence alone sets the deadline
+    // the human was last seen so that their disconnect deadline falls 1 ms after the bot's move
+    const p = { [m0.X!]: due + 1 - 35_000 }
+    const now = due + 2
+    const other = settleRoom(r, p, now, rng, { fullBotMatchId: 'ZZZZ' })
+    expect(byId(other.room, m0.id).moves).toHaveLength(1)
+    expect(byId(other.room, m0.id).status).toBe('playing') // the later disconnect is not applied either
+    expect(settleRoom(r, p, now, rng, { fullBotMatchId: null }).changed).toBe(false)
+    // in scope (or unscoped): the bot moves at its due time, then the disconnect applies
+    for (const opts of [{ fullBotMatchId: m0.id }, undefined]) {
+      const m = byId(settleRoom(r, p, now, rng, opts).room, m0.id)
+      expect(m.moves).toHaveLength(2)
+      expect(m.status).toBe('finished')
+      expect(m.endReason).toBe('disconnect_timeout')
+    }
+    // deferred for longer than BOT_DEFER_MAX_MS: any settle plays it (no stall)
+    const late = byId(settleRoom(r, { [m0.X!]: due + 10_000 }, due + 5_001, rng, { fullBotMatchId: null }).room, m0.id)
+    expect(late.moves).toHaveLength(2)
+    expect(late.moves[1].at).toBe(due)
+  })
+
   it('bot vs bot later-round match resolves inside one settle', () => {
     // 5 humans → 8 slots with bots in round-0 slots 0..2; humans of slots 0 and 1 resign → bots meet.
     let r = startedRoom(5, 3)
