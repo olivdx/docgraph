@@ -117,7 +117,7 @@ describe('Mongo stores', () => {
     expect(await presence.get('PRS001', [])).toEqual({})
     const doc = await db.collection<{ _id: string; at: number; expiresAt: Date }>('presence').findOne({ _id: 'PRS001:u1' })
     expect(doc!.expiresAt).toBeInstanceOf(Date)
-    expect(doc!.expiresAt.getTime()).toBe(T0 + 500 + 60 * 60 * 1000)
+    expect(doc!.expiresAt.getTime()).toBe(T0 + 500 + 15 * 60 * 1000)
   })
 
   it('ensureIndexes creates the TTL index with expireAfterSeconds: 0', async (ctx) => {

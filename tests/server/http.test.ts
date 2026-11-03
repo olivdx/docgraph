@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { errorResponse, parseCreateBody, parseMoveBody } from '@/src/server/http'
+import { buildInviteUrl, errorResponse, parseCreateBody, parseMoveBody } from '@/src/server/http'
 import { RoomError } from '@/src/tournament/types'
 
 describe('errorResponse', () => {
@@ -61,5 +61,16 @@ describe('parseCreateBody', () => {
   })
   it('non-string name -> 400', async () => {
     expect((await status(() => parseCreateBody({ name: 5 })))?.s).toBe(400)
+  })
+})
+
+describe('buildInviteUrl', () => {
+  it('needs both the bot username and the Mini App short name', () => {
+    expect(buildInviteUrl('ABC123', { TELEGRAM_BOT_USERNAME: 'cupbot', TELEGRAM_MINIAPP_SHORTNAME: 'cup' })).toBe(
+      'https://t.me/cupbot/cup?startapp=ABC123',
+    )
+    expect(buildInviteUrl('ABC123', { TELEGRAM_BOT_USERNAME: 'cupbot' })).toBe('')
+    expect(buildInviteUrl('ABC123', { TELEGRAM_MINIAPP_SHORTNAME: 'cup' })).toBe('')
+    expect(buildInviteUrl('ABC123', {})).toBe('')
   })
 })

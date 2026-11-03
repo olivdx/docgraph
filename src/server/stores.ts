@@ -18,7 +18,7 @@ export interface PresenceStore {
   get(code: string, userIds: string[]): Promise<Record<string, number>>
 }
 
-export const PRESENCE_TTL_MS = 60 * 60 * 1000
+export const PRESENCE_TTL_MS = 15 * 60 * 1000
 const OPEN: Room['status'][] = ['lobby', 'running']
 
 // ---- memory ------------------------------------------------------------------------------------

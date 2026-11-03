@@ -5,6 +5,14 @@ import { RoomError } from '@/src/tournament/types'
 
 let servicePromise: Promise<RoomService> | null = null
 
+/** `https://t.me/<bot>/<app>?startapp=<code>`, or '' when the bot username or app short name is not configured. */
+export function buildInviteUrl(code: string, env: Partial<Record<string, string>> = process.env): string {
+  const bot = env.TELEGRAM_BOT_USERNAME
+  const app = env.TELEGRAM_MINIAPP_SHORTNAME
+  if (!bot || !app) return ''
+  return `https://t.me/${bot}/${app}?startapp=${code}`
+}
+
 /** Lazy singleton: never touches Mongo until the first request. */
 export function getService(): Promise<RoomService> {
   servicePromise ??= getDb()
@@ -15,8 +23,7 @@ export function getService(): Promise<RoomService> {
           presence: new MongoPresenceStore(db),
           now: Date.now,
           rng: Math.random,
-          inviteUrl: (code) =>
-            `https://t.me/${process.env.TELEGRAM_BOT_USERNAME}/${process.env.TELEGRAM_MINIAPP_SHORTNAME}?startapp=${code}`,
+          inviteUrl: (code) => buildInviteUrl(code),
         }),
     )
     .catch((e) => {

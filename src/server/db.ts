@@ -36,9 +36,15 @@ export function getDb(): Promise<Db> {
     cache.promise = (async () => {
       const client = new MongoClient(mongoUri(), { maxPoolSize: 5 })
       await client.connect()
-      const db = client.db(DB_NAME)
-      await ensureIndexes(db)
-      return db
+      try {
+        const db = client.db(DB_NAME)
+        await ensureIndexes(db)
+        return db
+      } catch (e) {
+        // don't leak the connected client: the next request builds a fresh one
+        await client.close().catch(() => {})
+        throw e
+      }
     })().catch((e) => {
       cache.promise = null
       throw e

@@ -197,12 +197,14 @@ function Lobby({
       <div className={`${CARD} text-center`}>
         <div className="text-[13px] text-muted">Room</div>
         <div className="text-[30px] font-extrabold tracking-[0.25em] text-white">{view.code}</div>
-        <button
-          onClick={() => shareInvite(view.inviteUrl, `Join my Caro Cup tournament "${view.name}"!`)}
-          className={`${GHOST} mt-2.5`}
-        >
-          ↗ Share invite link
-        </button>
+        {view.inviteUrl && (
+          <button
+            onClick={() => shareInvite(view.inviteUrl, `Join my Caro Cup tournament "${view.name}"!`)}
+            className={`${GHOST} mt-2.5`}
+          >
+            ↗ Share invite link
+          </button>
+        )}
       </div>
 
       <div className={`${CARD} flex-1`}>
