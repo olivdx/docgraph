@@ -49,7 +49,7 @@ It's for fun, not ranking. Nothing about the players is kept once a tournament i
 | Storage | MongoDB (existing Atlas cluster). Tournament data is deleted after the tournament ends. No ELO. |
 | Hosting | Vercel |
 | Language | English UI |
-| Look | Dark slate app shell, bracket as in the owner's screenshot. Board is a light "graph paper" grid with blue X and red O, both drawn with thick (≈4px) strokes and centered in the cell. The last move is highlighted. There are zoom +/−/fit buttons. |
+| Look | Dark slate app shell, bracket as in the owner's screenshot. Board is a light "graph paper" grid with blue X and red O, both drawn with thick (≈4px) strokes and centered in the cell. The last move is highlighted. No zoom: fixed 32 px cells, drag to pan, and a single ⌖ button that recenters on the last move. Beyond the board edge the dark shell shows. |
 
 ## 4. Calls made by Claude (owner may override)
 
@@ -63,7 +63,7 @@ It's for fun, not ranking. Nothing about the players is kept once a tournament i
 - Matches in a round run in parallel. The next round's match opens as soon as both its feeder matches are finished (it doesn't wait for the whole round).
 - The 3rd-place match is between the semifinal losers. It's played in parallel with the final.
 - The tournament is deleted 10 minutes after it ends, and lobbies with no Start are deleted 2 hours after creation (MongoDB TTL index).
-- Board is a fixed 30×30. The board edge counts as a blocking end.
+- 100×100 board (−50..49), drag to pan, centered on (0,0). The board edge counts as a blocking end. Moves outside −50..49 are rejected (`out_of_bounds`).
 - Bot "thinking" delay is 0.5–1 s, so its moves feel natural.
 - Tournament name defaults to "<host first name>'s Cup". The host can edit it at creation.
 - Prisma and Postgres are removed from the project. `src/server/persistence/elo.ts` and its test are deleted.
@@ -118,19 +118,19 @@ Vercel has no long-lived processes and no WebSocket server, so:
 `matches`
 - `_id`, `code` (short match code shown in UI, e.g. `#A3F9`), `tournamentId`, `round`, `slot`, `kind`: `normal | third_place`
 - `players`: `{ X: {userId, isBot}, O: {userId, isBot} }`
-- `moves[]`: `{ x, y, side, at }`. The board is derived from the moves (at most 900 entries).
+- `moves[]`: `{ x, y, side, at }`. The board is derived from the moves (a sparse board keyed by cell; only occupied cells exist).
 - `turn`, `turnDeadlineAt`, `botMoveDueAt?`, `lastSeenAt: { X, O }`
 - `status`: `pending | playing | finished`, `readyAt: { X?, O? }`, `pendingSince`, `winner`, `endReason`: `five_in_row | turn_timeout | disconnect_timeout | resign | no_show | board_full`, `winLine?`
 - `version`, `expiresAt` (TTL, same as its tournament)
 
-A draw (board full) is practically impossible on 30×30. If it happens, X wins, and this is recorded as `endReason: board_full`.
+A draw (board full) is practically impossible on 100×100. `board_full` remains only as a safety cap for bot-run games: a bot-vs-bot game (or a due bot move) at 900 moves without a winner ends with X winning, recorded as `endReason: board_full`.
 
 ## 7. Screens (see mock)
 
 1. **Home**: title, greeting, a **＋ Create** button, "Your tournament" (pinned with Resume, if any), "Open rooms" (lobby rooms with **Join**, running rooms with **View**), pull to refresh.
 2. **Lobby**: room code, **Share invite link** (opens Telegram share with the ref link), player list (host badge), a "N players → M-slot bracket, K bots added" hint, and **Start tournament** (host only, enabled when there are 2 or more humans). Non-hosts see "Waiting for host to start…".
 3. **Bracket**: horizontally scrollable rounds (Round of 32 … Quarterfinal, Semifinal, Final, 3rd-place). Winners are bold with a green score, losers are dimmed, live matches are tagged, and your match is outlined. A "Your match is ready → Enter match" card appears when applicable.
-4. **Match**: HUD with both players, mark, turn state and countdown. A disconnect banner shows the reconnect countdown. The board supports pan, pinch and zoom buttons, and there's a Resign button (with confirm). Move number and match code are shown.
+4. **Match**: HUD with both players, mark, turn state and countdown. A disconnect banner shows the reconnect countdown. The board is dragged to pan (no zoom, no pinch; a short tap places a stone, a drag of 8 px or more only pans) with a ⌖ recenter button, and there's a Resign button (with confirm). Move number and match code are shown.
 5. **Result**: win/lose card after each match. Champion screen with podium when the tournament ends, then **Back to rooms**.
 
 ## 8. Game logic
