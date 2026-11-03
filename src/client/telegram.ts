@@ -4,6 +4,8 @@ interface TelegramWebApp {
   ready(): void
   expand(): void
   openTelegramLink(url: string): void
+  /** Bot API 7.7+; older clients don't have it. */
+  disableVerticalSwipes?(): void
   colorScheme?: 'light' | 'dark'
 }
 
@@ -34,6 +36,8 @@ export function initTelegram(): void {
   if (!wa) return
   wa.ready()
   wa.expand()
+  // Vertical swipes would minimize the Mini App while the player pans the board.
+  wa.disableVerticalSwipes?.()
 }
 
 export function shareInvite(url: string, text: string): void {
