@@ -8,6 +8,7 @@ import {
   isCellVisible,
   isTap,
   offsetToCenterOn,
+  translateOf,
 } from '@/src/client/board-geometry'
 
 // Offset = screen position (px, relative to the viewport's top-left) of cell (0,0)'s top-left corner.
@@ -104,5 +105,20 @@ describe('isCellVisible', () => {
   it('works for negative cells', () => {
     expect(isCellVisible({ x: -3, y: -2 }, { x: 160, y: 100 }, 320, 480, 32)).toBe(true)
     expect(isCellVisible({ x: -6, y: -2 }, { x: 160, y: 100 }, 320, 480, 32)).toBe(false)
+  })
+})
+
+describe('translateOf', () => {
+  it('reads the translation from a computed 2D matrix', () => {
+    expect(translateOf('matrix(1, 0, 0, 1, -123.5, 40)')).toEqual({ x: -123.5, y: 40 })
+  })
+  it('reads the translation from a computed matrix3d', () => {
+    expect(translateOf('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 12, -7.25, 0, 1)')).toEqual({ x: 12, y: -7.25 })
+  })
+  it('returns null for none or anything unparseable', () => {
+    expect(translateOf('none')).toBeNull()
+    expect(translateOf('')).toBeNull()
+    expect(translateOf('matrix(1, 0, 0)')).toBeNull()
+    expect(translateOf('matrix(1, 0, 0, 1, a, 2)')).toBeNull()
   })
 })

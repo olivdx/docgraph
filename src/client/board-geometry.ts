@@ -63,3 +63,15 @@ export function isCellVisible(
   const y0 = cell.y * cellSize + offset.y
   return x0 >= 0 && y0 >= 0 && x0 + cellSize <= viewportW && y0 + cellSize <= viewportH
 }
+
+/**
+ * The translation of a computed CSS transform (`getComputedStyle(el).transform`), i.e. where an
+ * element actually is mid-transition. Null for `none` or anything unparseable.
+ */
+export function translateOf(transform: string): Offset | null {
+  const m = /^matrix(3d)?\(([^)]*)\)$/.exec(transform.trim())
+  if (!m) return null
+  const v = m[2].split(',').map((s) => Number(s.trim()))
+  if (v.length !== (m[1] ? 16 : 6) || v.some((n) => !Number.isFinite(n))) return null
+  return m[1] ? { x: v[12], y: v[13] } : { x: v[4], y: v[5] }
+}

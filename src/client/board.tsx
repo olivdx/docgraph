@@ -10,6 +10,7 @@ import {
   isCellVisible,
   isTap,
   offsetToCenterOn,
+  translateOf,
   type Offset,
 } from './board-geometry'
 import { Mark } from './marks'
@@ -105,8 +106,25 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
 
   const onRecenter = () => centerOn(last ? { x: last.x, y: last.y } : boundsCenter(moves), true)
 
+  /**
+   * Stops a running glide where it is on screen: `offset.current` holds the glide's target while the
+   * CSS transition is still animating, so taps and drags must start from the live position.
+   */
+  const freeze = () => {
+    const el = plane.current
+    if (!el || !el.style.transition || el.style.transition === 'none') return
+    const live = translateOf(getComputedStyle(el).transform)
+    if (live) setOffset(live)
+    else el.style.transition = 'none'
+  }
+
+  const setGrabbing = (on: boolean) => {
+    if (viewport.current) viewport.current.style.cursor = on ? 'grabbing' : ''
+  }
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (drag.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    freeze()
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, from: offset.current, panning: false }
   }
@@ -117,6 +135,7 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
     const dx = e.clientX - d.sx
     const dy = e.clientY - d.sy
     if (!d.panning && isTap(dx, dy)) return
+    if (!d.panning) setGrabbing(true)
     d.panning = true // once past the slop it stays a pan, even if the pointer comes back
     setOffset({ x: d.from.x + dx, y: d.from.y + dy })
   }
@@ -125,6 +144,7 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
     const d = drag.current
     if (!d || d.id !== e.pointerId) return
     drag.current = null
+    setGrabbing(false)
     if (d.panning || !isTap(e.clientX - d.sx, e.clientY - d.sy) || !canPlay) return
     const rect = e.currentTarget.getBoundingClientRect()
     const cell = cellAtPoint(e.clientX - rect.left, e.clientY - rect.top, offset.current, cs)
@@ -133,7 +153,9 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
   }
 
   const onPointerCancel = (e: PointerEvent<HTMLDivElement>) => {
-    if (drag.current?.id === e.pointerId) drag.current = null
+    if (drag.current?.id !== e.pointerId) return
+    drag.current = null
+    setGrabbing(false)
   }
 
   const span = (BOARD_MAX - BOARD_MIN + 1) * cs
