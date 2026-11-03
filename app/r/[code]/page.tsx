@@ -3,8 +3,10 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
+import { roomPath } from '@/src/client/routes'
 import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
+import { caroRoomChannel } from '@/src/realtime/channels'
 import type { BracketMatchView, Entrant, RoomView } from '@/src/tournament/views'
 
 const AVATAR_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
@@ -28,7 +30,10 @@ function Room() {
   const search = useSearchParams()
   const router = useRouter()
   const wantsJoin = search.get('join') === '1'
-  const { data: room, error, refresh } = usePoll<RoomView>(`/api/rooms/${code}`, 3_000)
+  const { data: room, error, refresh } = usePoll<RoomView>(`/api/rooms/${code}`, 3_000, {
+    channel: caroRoomChannel(code),
+    liveIntervalMs: 15_000,
+  })
   const [override, setOverride] = useState<RoomView | null>(null)
   const [blockedBy, setBlockedBy] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -95,7 +100,7 @@ function Room() {
           setOverride(r)
           setBusy(false)
         } else {
-          router.push('/')
+          router.push('/caro')
         }
       } catch (e) {
         const c = e instanceof ApiError ? e.code : 'unknown'
@@ -119,7 +124,7 @@ function Room() {
         {error?.status === 404 ? (
           <>
             <div>Room not found. It may have expired.</div>
-            <button onClick={() => router.push('/')} className={`${GHOST} max-w-60`}>
+            <button onClick={() => router.push('/caro')} className={`${GHOST} max-w-60`}>
               Back to rooms
             </button>
           </>
@@ -137,7 +142,7 @@ function Room() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
       <div className="flex items-center gap-2 text-sm text-slate-300">
-        <button onClick={() => router.push('/')} aria-label="Back to rooms" className="-ml-1 px-1 text-lg leading-none">
+        <button onClick={() => router.push('/caro')} aria-label="Back to rooms" className="-ml-1 px-1 text-lg leading-none">
           ←
         </button>
         <span className="truncate font-semibold">{view.name}</span>
@@ -146,7 +151,7 @@ function Room() {
       {blockedBy !== null && (
         <div className="rounded-[10px] border border-[#78591a] bg-[#3a2a0b] px-2.5 py-2 text-xs text-amber-200">
           You&apos;re already playing in {blockedBy} →{' '}
-          <button onClick={() => router.push(blockedBy ? `/r/${blockedBy}` : '/')} className="font-semibold underline">
+          <button onClick={() => router.push(blockedBy ? roomPath(blockedBy) : '/')} className="font-semibold underline">
             Go back
           </button>
         </div>
@@ -168,7 +173,7 @@ function Room() {
               </div>
             )}
             <div className="mt-2.5 text-xs text-muted">This room closes in 10 minutes.</div>
-            <button onClick={() => router.push('/')} className={`${GHOST} mt-3`}>
+            <button onClick={() => router.push('/caro')} className={`${GHOST} mt-3`}>
               Back to rooms
             </button>
           </div>
@@ -178,7 +183,7 @@ function Room() {
       {view.status === 'cancelled' && (
         <div className={`${CARD} text-center`}>
           <div className="mb-3 text-sm">This tournament was cancelled.</div>
-          <button onClick={() => router.push('/')} className={GHOST}>
+          <button onClick={() => router.push('/caro')} className={GHOST}>
             Back to rooms
           </button>
         </div>

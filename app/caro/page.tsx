@@ -2,44 +2,33 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ApiError, apiGet, apiPost } from '@/src/client/api'
-import { getStartParam, initTelegram } from '@/src/client/telegram'
+import { ApiError, apiPost } from '@/src/client/api'
+import { roomPath } from '@/src/client/routes'
+import { initTelegram } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import type { RoomSummary, RoomView } from '@/src/tournament/views'
 
 interface Me {
   user: { id: string; name: string; avatarUrl: string | null }
-  active: { code: string; matchId: string | null } | null
+  active: { game: 'caro' | 'sudoku'; code: string; matchId: string | null } | null
 }
 
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
 const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]
 
-/** True only the first time this session (sessionStorage flag). */
-function firstBoot(): boolean {
-  try {
-    if (sessionStorage.getItem('booted')) return false
-    sessionStorage.setItem('booted', '1')
-    return true
-  } catch {
-    return false
-  }
-}
-
-export default function Home() {
+export default function CaroHome() {
   const router = useRouter()
-  const [booting, setBooting] = useState(true)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ text: string; code?: string } | null>(null)
-  const rooms = usePoll<RoomSummary[]>(booting ? null : '/api/rooms', 10_000)
+  const rooms = usePoll<RoomSummary[]>('/api/rooms', 10_000)
   const [hasActive, setHasActive] = useState(false)
   // While you're in a tournament, check often whether your next match is ready.
-  const me = usePoll<Me>(booting ? null : '/api/me', hasActive ? 10_000 : 60_000)
+  const me = usePoll<Me>('/api/me', hasActive ? 10_000 : 60_000)
   const nowActive = !!me.data?.active
   if (nowActive !== hasActive) setHasActive(nowActive) // adjust state while rendering (no extra effect)
 
   // A pending/playing match of yours: enter it once (same sessionStorage guard as the bracket page).
-  const activeCode = me.data?.active?.code ?? null
+  const activeCode = me.data?.active?.game === 'caro' ? me.data.active.code : null
   const activeMatchId = me.data?.active?.matchId ?? null
   useEffect(() => {
     if (!activeCode || !activeMatchId) return
@@ -55,23 +44,7 @@ export default function Home() {
 
   useEffect(() => {
     initTelegram()
-    if (!firstBoot()) {
-      void Promise.resolve().then(() => setBooting(false))
-      return
-    }
-    const start = getStartParam()
-    if (start) {
-      router.replace(`/r/${encodeURIComponent(start)}?join=1`)
-      return
-    }
-    apiGet<Me>('/api/me')
-      .then((m) => {
-        if (m.active) {
-          router.replace(m.active.matchId ? `/r/${m.active.code}/m/${m.active.matchId}` : `/r/${m.active.code}`)
-        } else setBooting(false)
-      })
-      .catch(() => setBooting(false))
-  }, [router])
+  }, [])
 
   const act = useCallback(
     async (path: string) => {
@@ -92,10 +65,6 @@ export default function Home() {
     },
     [busy, router],
   )
-
-  if (booting) {
-    return <main className="flex flex-1 items-center justify-center text-sm text-muted">Loading…</main>
-  }
 
   const list = rooms.data ?? []
   const mine = list.filter((r) => r.youAreIn)
@@ -156,7 +125,10 @@ export default function Home() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[22px] font-bold">Tournaments</div>
+          <button onClick={() => router.push('/')} className="-ml-1 px-1 text-[13px] text-muted">
+            ← Games
+          </button>
+          <div className="text-[22px] font-bold">Caro tournaments</div>
           {firstName && (
             <div className="text-[13px] text-muted">
               Hi, <b className="text-text">{firstName}</b>
@@ -192,7 +164,7 @@ export default function Home() {
           <span className="flex-1">{toast.text}</span>
           {toast.code && (
             <button
-              onClick={() => router.push(`/r/${toast.code}`)}
+              onClick={() => router.push(roomPath(toast.code!))}
               className="rounded-[9px] bg-accent px-3 py-1.5 text-[13px] font-semibold text-white"
             >
               Go

@@ -90,6 +90,14 @@ Vercel has no long-lived processes and no WebSocket server, so:
 - When both sides are ready, the match switches to `playing` and the first turn clock starts.
 - **No-show rule:** if a human hasn't opened the match within 60 s of it becoming `pending`, they forfeit with `endReason: no_show`. If both no-show, the higher seed advances.
 
+### Realtime (Ably), added 2026-11-04
+
+- Ably is a doorbell, not a data channel. After every successful write the server publishes `changed` with `{ v: version }` on the affected channels: `caro:<code>` when the lobby/bracket shape changes, `caro:<code>:<matchId>` for each match that changed, and `sudoku:<code>` for any Sudoku room write. Clients re-fetch through the normal API, so MongoDB stays the single source of truth and no game data (or Sudoku solution) goes through Ably.
+- Publishing runs in Next's `after()`, so a move's response never waits on Ably. Failures are logged and ignored.
+- `GET /api/realtime/token` (Telegram-authenticated) returns a signed Ably token request: subscribe-only on `caro:*` and `sudoku:*`, 1 hour. Clients can't publish. Without `ABLY_API_KEY` the endpoint returns 404, the client never loads the SDK, and everything runs on polling alone.
+- While the channel is live, polling relaxes: lobby/bracket 3 s → 15 s, Sudoku room 2 s → 5 s. The Caro match screen goes 1 s → 2 s vs a human (it's still the presence heartbeat; disconnects show after 5 s), with an extra fetch just after each known deadline. It stays at 1 s vs a bot, because a bot reply is only played when a request settles the match.
+- After a realtime reconnect, the screen re-fetches once to cover missed signals.
+
 ### Polling budget, Claude's call
 - Design for the free tiers (Vercel Hobby, Atlas M0). Use the global cached `MongoClient` pattern, with a small pool.
 - Adaptive polling: about 1 s on the Match screen, about 3 s on Lobby and Bracket, about 10 s on Home. Polling stops when the page is hidden (`visibilitychange`). Presence is only needed during a match, and the returning player re-polls on visibility.

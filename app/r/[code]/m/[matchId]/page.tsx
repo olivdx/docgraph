@@ -5,10 +5,16 @@ import { useParams, useRouter } from 'next/navigation'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { Board } from '@/src/client/board'
 import { Mark } from '@/src/client/marks'
+import { useRealtime } from '@/src/client/realtime'
+import { caroMatchChannel } from '@/src/realtime/channels'
 import type { Cell, Side } from '@/src/game/types'
 import type { MatchView } from '@/src/tournament/views'
 
 const POLL_MS = 1_000
+/** Poll interval when realtime is live vs a human: still the presence heartbeat (disconnect shows after 5 s). */
+const LIVE_POLL_MS = 2_000
+/** Fetch this long after a known deadline, so the server has settled it. */
+const DEADLINE_SLACK_MS = 150
 const NEXT_POLL_MS = 3_000 // after the match: waiting for the next match to become pending
 const TICK_MS = 250
 const TURN_MS = 25_000 // mirrors the server's TURN_MS; display only (idle side's clock)
@@ -59,8 +65,17 @@ const clock = (ms: number) => {
 }
 
 /** Delay before the next poll, or null to stop polling (finished, nothing left to wait for). */
-function nextPollDelay(v: MatchView | null): number | null {
-  if (!v || v.status !== 'finished') return POLL_MS
+function nextPollDelay(v: MatchView | null, live: boolean): number | null {
+  if (!v) return POLL_MS
+  if (v.status !== 'finished') {
+    const opp = v.you === 'X' ? v.players.O : v.you === 'O' ? v.players.X : null
+    // A bot's reply is only played when someone's request settles the match, so keep 1 s vs bots.
+    if (!live || !opp || opp.isBot) return POLL_MS
+    const deadlines = [v.turnRemainingMs, v.pendingRemainingMs, v.opponentReconnectRemainingMs].filter(
+      (d): d is number => d !== null && d >= 0,
+    )
+    return Math.min(LIVE_POLL_MS, ...deadlines.map((d) => d + DEADLINE_SLACK_MS))
+  }
   if (v.nextStep === 'next_match' && !v.nextMatchId) return NEXT_POLL_MS
   return null
 }
@@ -106,6 +121,13 @@ export default function MatchPage() {
     setLoadError(null)
   }, [])
 
+  const kickRef = useRef<() => void>(() => {})
+  const live = useRealtime(caroMatchChannel(code, matchId), () => kickRef.current())
+  const liveRef = useRef(live)
+  useEffect(() => {
+    liveRef.current = live
+  }, [live])
+
   const poll = useCallback(async () => {
     const my = ++seq.current
     try {
@@ -118,11 +140,13 @@ export default function MatchPage() {
   }, [path, apply])
 
   // Completion-chained polling: the next request is scheduled only after the previous one settled.
-  // Paused while hidden; 1 s while the match is live, 3 s on the result card while waiting for the
-  // next match, stopped otherwise.
+  // Paused while hidden; 1 s while the match is live (2 s, or until the next deadline, when realtime
+  // signals are flowing vs a human), 3 s on the result card while waiting for the next match,
+  // stopped otherwise. A realtime signal fetches right away (or right after the in-flight request).
   useEffect(() => {
     let stopped = false
     let running = false
+    let again = false
     let timer: ReturnType<typeof setTimeout> | null = null
     const run = async () => {
       timer = null
@@ -131,18 +155,32 @@ export default function MatchPage() {
       await poll()
       running = false
       if (stopped) return
-      const delay = nextPollDelay(latest.current)
+      if (again) {
+        again = false
+        void run()
+        return
+      }
+      const delay = nextPollDelay(latest.current, liveRef.current)
       if (delay !== null) timer = setTimeout(() => void run(), delay)
     }
-    const onVis = () => {
-      if (document.hidden || running) return
+    const kick = () => {
+      if (stopped || document.hidden) return
+      if (running) {
+        again = true
+        return
+      }
       if (timer) clearTimeout(timer)
       void run()
+    }
+    kickRef.current = kick
+    const onVis = () => {
+      if (!document.hidden) kick()
     }
     timer = setTimeout(() => void run(), 0)
     document.addEventListener('visibilitychange', onVis)
     return () => {
       stopped = true
+      kickRef.current = () => {}
       if (timer) clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVis)
     }

@@ -1,12 +1,16 @@
 import { authenticate } from '@/src/server/telegram-auth'
-import { errorResponse, getService } from '@/src/server/http'
+import { errorResponse, getService, getSudokuService } from '@/src/server/http'
 
 export const dynamic = 'force-dynamic'
 
+/** Who am I, and where am I active (at most one room across both games)? */
 export async function GET(req: Request) {
   try {
     const user = authenticate(req)
-    return Response.json(await (await getService()).me(user))
+    const caro = await (await getService()).me(user)
+    if (caro.active) return Response.json({ user, active: { game: 'caro', ...caro.active } })
+    const code = await (await getSudokuService()).activeCode(user.id)
+    return Response.json({ user, active: code ? { game: 'sudoku', code, matchId: null } : null })
   } catch (e) {
     return errorResponse(e)
   }

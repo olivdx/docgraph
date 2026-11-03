@@ -22,6 +22,7 @@ import {
   type RoomSummary,
   type RoomView,
 } from '@/src/tournament/views'
+import { caroMatchChannel, caroRoomChannel } from '@/src/realtime/channels'
 import type { PresenceStore, RoomStore } from './stores'
 import type { TelegramUser } from './telegram-auth'
 
@@ -31,6 +32,10 @@ export interface RoomServiceDeps {
   now: () => number
   rng: () => number
   inviteUrl: (code: string) => string
+  /** The code of a room the user is active in in the *other* game (Sudoku), or null. */
+  activeElsewhere?: (userId: string) => Promise<string | null>
+  /** Called after each successful write with the realtime channels whose content changed. */
+  notify?: (channels: string[], version: number) => void
 }
 
 const MAX_ATTEMPTS = 5
@@ -52,6 +57,28 @@ interface Mutated {
   room: Room
   presence: Presence
   now: number
+}
+
+/** What the lobby/bracket shows: a change here notifies the room channel (moves alone don't). */
+function bracketShape(room: Room): string {
+  return JSON.stringify([
+    room.status,
+    room.name,
+    room.players,
+    room.placements,
+    room.matches.map((m) => [m.id, m.status, m.a, m.b, m.X, m.O, m.winner, m.readyAt]),
+  ])
+}
+
+/** Realtime channels touched by a write from `before` to `after`. */
+export function changedChannels(before: Room, after: Room): string[] {
+  const out: string[] = []
+  if (bracketShape(before) !== bracketShape(after)) out.push(caroRoomChannel(after._id))
+  for (const m of after.matches) {
+    const prev = before.matches.find((x) => x.id === m.id)
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(m)) out.push(caroMatchChannel(after._id, m.id))
+  }
+  return out
 }
 
 const userInfo = (u: TelegramUser) => ({ userId: u.id, name: u.name, avatarUrl: u.avatarUrl })
@@ -78,6 +105,11 @@ export class RoomService {
       return { user, active: { code: room._id, matchId: m?.id ?? null } }
     }
     return { user, active: null }
+  }
+
+  /** Code of the Caro room this user is active in, else null. */
+  async activeCode(userId: string): Promise<string | null> {
+    return (await this.me({ id: userId, name: '', avatarUrl: null })).active?.code ?? null
   }
 
   async list(user: TelegramUser): Promise<RoomSummary[]> {
@@ -165,6 +197,8 @@ export class RoomService {
 
   /** Throws already_active (extra.activeCode) if the user is active in a room other than `exceptCode`. */
   private async assertNotActiveElsewhere(userId: string, exceptCode: string | null): Promise<void> {
+    const other = await this.deps.activeElsewhere?.(userId)
+    if (other) throw new RoomError('already_active', { activeCode: other })
     const now = this.deps.now()
     for (const loaded of await this.deps.rooms.findByPlayer(userId)) {
       if (loaded._id === exceptCode) continue
@@ -220,7 +254,11 @@ export class RoomService {
         if (!(e instanceof RoomError)) throw e
         const settled = settle()
         if (!settled.changed) throw e
-        if (await this.write(settled.room, loaded.version, now)) throw e
+        const written = await this.write(settled.room, loaded.version, now)
+        if (written) {
+          this.notifyChanged(loaded, written)
+          throw e
+        }
         continue // CAS lost: re-read and retry
       }
       // settling changes the room whenever it reports `changed`, so equality means "nothing to write"
@@ -228,9 +266,18 @@ export class RoomService {
         return { room: loaded, presence, now }
       }
       const saved = await this.write(next, loaded.version, now)
-      if (saved) return { room: saved, presence, now }
+      if (saved) {
+        this.notifyChanged(loaded, saved)
+        return { room: saved, presence, now }
+      }
     }
     throw new RoomError('conflict')
+  }
+
+  private notifyChanged(before: Room, after: Room): void {
+    if (!this.deps.notify) return
+    const channels = changedChannels(before, after)
+    if (channels.length) this.deps.notify(channels, after.version)
   }
 
   /** CAS write; a running room gets its activity expiry refreshed. Returns the stored room or null. */

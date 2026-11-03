@@ -1,9 +1,12 @@
+import { after } from 'next/server'
+import { publishChanged, realtimeEnabled } from './realtime'
 import { RoomService } from './room-service'
 import { getDb } from './db'
 import { MongoPresenceStore, MongoRoomStore } from './stores'
+import { SudokuService } from './sudoku-service'
+import { MongoSudokuStore } from './sudoku-store'
+import { isDifficulty, type Difficulty } from '@/src/sudoku/types'
 import { RoomError } from '@/src/tournament/types'
-
-let servicePromise: Promise<RoomService> | null = null
 
 /** `https://t.me/<bot>/<app>?startapp=<code>`, or '' when the bot username or app short name is not configured. */
 export function buildInviteUrl(code: string, env: Partial<Record<string, string>> = process.env): string {
@@ -13,25 +16,51 @@ export function buildInviteUrl(code: string, env: Partial<Record<string, string>
   return `https://t.me/${bot}/${app}?startapp=${code}`
 }
 
-/** Lazy singleton: never touches Mongo until the first request. */
-export function getService(): Promise<RoomService> {
-  servicePromise ??= getDb()
-    .then(
-      (db) =>
-        new RoomService({
-          rooms: new MongoRoomStore(db),
-          presence: new MongoPresenceStore(db),
-          now: Date.now,
-          rng: Math.random,
-          inviteUrl: (code) => buildInviteUrl(code),
-        }),
-    )
+/** Publish after the response is sent, so a move's reply never waits on Ably. */
+function notify(channels: string[], version: number): void {
+  if (!realtimeEnabled()) return
+  after(() => publishChanged(channels, version))
+}
+
+interface Services {
+  caro: RoomService
+  sudoku: SudokuService
+}
+let servicesPromise: Promise<Services> | null = null
+
+/** Lazy singleton: never touches Mongo until the first request. Each game checks the other for an active room. */
+function getServices(): Promise<Services> {
+  servicesPromise ??= getDb()
+    .then((db) => {
+      const out = {} as Services
+      out.caro = new RoomService({
+        rooms: new MongoRoomStore(db),
+        presence: new MongoPresenceStore(db),
+        now: Date.now,
+        rng: Math.random,
+        inviteUrl: (code) => buildInviteUrl(code),
+        activeElsewhere: (userId) => out.sudoku.activeCode(userId),
+        notify,
+      })
+      out.sudoku = new SudokuService({
+        rooms: new MongoSudokuStore(db),
+        now: Date.now,
+        rng: Math.random,
+        inviteUrl: (code) => buildInviteUrl(code),
+        activeElsewhere: (userId) => out.caro.activeCode(userId),
+        notify,
+      })
+      return out
+    })
     .catch((e) => {
-      servicePromise = null
+      servicesPromise = null
       throw e
     })
-  return servicePromise
+  return servicesPromise
 }
+
+export const getService = async (): Promise<RoomService> => (await getServices()).caro
+export const getSudokuService = async (): Promise<SudokuService> => (await getServices()).sudoku
 
 const STATUS: Record<string, number> = {
   not_found: 404,
@@ -82,6 +111,27 @@ export async function readJson(req: Request): Promise<unknown> {
   } catch {
     return undefined
   }
+}
+
+export function parseSudokuCreateBody(json: unknown): { name?: string; difficulty?: Difficulty } {
+  const name = parseCreateBody(json)
+  if (!isObject(json) || json.difficulty === undefined) return { name }
+  if (!isDifficulty(json.difficulty)) throw badRequest()
+  return { name, difficulty: json.difficulty }
+}
+
+export function parseDifficultyBody(json: unknown): Difficulty {
+  if (!isObject(json) || !isDifficulty(json.difficulty)) throw badRequest()
+  return json.difficulty
+}
+
+export function parseEntryBody(json: unknown): { cell: number; digit: number; seq: number } {
+  if (!isObject(json)) throw badRequest()
+  const { cell, digit, seq } = json
+  if (!Number.isInteger(cell) || !Number.isInteger(digit) || !Number.isInteger(seq)) throw badRequest()
+  const [c, d, n] = [cell as number, digit as number, seq as number]
+  if (c < 0 || c > 80 || d < 1 || d > 9 || n < 1) throw badRequest()
+  return { cell: c, digit: d, seq: n }
 }
 
 export const codeOf = (c: string) => c.toUpperCase()
