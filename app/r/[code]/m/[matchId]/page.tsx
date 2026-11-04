@@ -5,19 +5,22 @@ import { useParams, useRouter } from 'next/navigation'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { Board } from '@/src/client/board'
 import { Mark } from '@/src/client/marks'
+import { applyMoveSignal, isBehindSignal, SIGNAL_GRACE_MS, type PendingSignal } from '@/src/client/match-signal'
 import { useRealtime } from '@/src/client/realtime'
-import { caroMatchChannel } from '@/src/realtime/channels'
+import { caroMatchChannel, type MoveSignal } from '@/src/realtime/channels'
+import { TURN_MS } from '@/src/tournament/constants'
 import type { Cell, Side } from '@/src/game/types'
 import type { MatchView } from '@/src/tournament/views'
 
 const POLL_MS = 1_000
 /** Poll interval when realtime is live vs a human: still the presence heartbeat (disconnect shows after 5 s). */
 const LIVE_POLL_MS = 2_000
+/** Spectators send no heartbeat, so with realtime live they only need a slow safety net. */
+const WATCH_POLL_MS = 3_000
 /** Fetch this long after a known deadline, so the server has settled it. */
 const DEADLINE_SLACK_MS = 150
 const NEXT_POLL_MS = 3_000 // after the match: waiting for the next match to become pending
 const TICK_MS = 250
-const TURN_MS = 25_000 // mirrors the server's TURN_MS; display only (idle side's clock)
 
 type EndReason = NonNullable<MatchView['endReason']>
 
@@ -68,13 +71,20 @@ const clock = (ms: number) => {
 function nextPollDelay(v: MatchView | null, live: boolean): number | null {
   if (!v) return POLL_MS
   if (v.status !== 'finished') {
-    const opp = v.you === 'X' ? v.players.O : v.you === 'O' ? v.players.X : null
-    // A bot's reply is only played when someone's request settles the match, so keep 1 s vs bots.
-    if (!live || !opp || opp.isBot) return POLL_MS
-    const deadlines = [v.turnRemainingMs, v.pendingRemainingMs, v.opponentReconnectRemainingMs].filter(
+    if (!live) return POLL_MS
+    let base: number
+    if (v.you === null) {
+      base = WATCH_POLL_MS // the players' own requests settle the match; realtime tells us when
+    } else {
+      const opp = v.you === 'X' ? v.players.O : v.players.X
+      // A bot's reply is only played when someone's request settles the match, so keep 1 s vs bots.
+      if (!opp || opp.isBot) return POLL_MS
+      base = LIVE_POLL_MS
+    }
+    const deadlines = [v.turnRemainingMs, v.pendingRemainingMs, v.opponentReconnectRemainingMs, v.nextGameRemainingMs].filter(
       (d): d is number => d !== null && d >= 0,
     )
-    return Math.min(LIVE_POLL_MS, ...deadlines.map((d) => d + DEADLINE_SLACK_MS))
+    return Math.min(base, ...deadlines.map((d) => d + DEADLINE_SLACK_MS))
   }
   if (v.nextStep === 'next_match' && !v.nextMatchId) return NEXT_POLL_MS
   return null
@@ -106,6 +116,7 @@ export default function MatchPage() {
   const [now, setNow] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const [inFlight, setInFlight] = useState(false)
+  const [resultHidden, setResultHidden] = useState(false)
   const flying = useRef(false)
   const seq = useRef(0)
   const applied = useRef(0)
@@ -121,8 +132,22 @@ export default function MatchPage() {
     setLoadError(null)
   }, [])
 
+  // An opponent's move arrives over realtime before it is stored: draw it at once, and for a short
+  // grace period ignore fetched views that don't have it yet (they were read before the write).
+  const pendingSignal = useRef<PendingSignal | null>(null)
+  const onMove = useCallback((s: MoveSignal) => {
+    if (flying.current || !latest.current) return
+    const next = applyMoveSignal(latest.current, s)
+    if (!next) return
+    const at = Date.now()
+    pendingSignal.current = { game: next.gameNo, count: next.moves.length, until: at + SIGNAL_GRACE_MS }
+    latest.current = next
+    setState({ view: next, at })
+    setNow(at)
+  }, [])
+
   const kickRef = useRef<() => void>(() => {})
-  const live = useRealtime(caroMatchChannel(code, matchId), () => kickRef.current())
+  const live = useRealtime(caroMatchChannel(code, matchId), () => kickRef.current(), onMove)
   const liveRef = useRef(live)
   useEffect(() => {
     liveRef.current = live
@@ -133,6 +158,7 @@ export default function MatchPage() {
     try {
       const v = await apiGet<MatchView>(path)
       if (flying.current) return // the move response will bring a fresher view
+      if (isBehindSignal(v, pendingSignal.current, Date.now())) return
       apply(my, v)
     } catch (e) {
       if (my >= applied.current) setLoadError(e instanceof ApiError ? e : new ApiError(0, 'unknown'))
@@ -187,7 +213,8 @@ export default function MatchPage() {
   }, [poll])
 
   // Your next match became pending: enter it automatically (once per session, like the bracket page).
-  const nextMatchId = state?.view.you ? state.view.nextMatchId : null
+  // (Also while watching someone else's match: your own match takes priority.)
+  const nextMatchId = state?.view.nextMatchId ?? null
   useEffect(() => {
     if (nextMatchId && firstTime(`auto:${nextMatchId}`)) router.push(`/r/${code}/m/${nextMatchId}`)
   }, [nextMatchId, code, router])
@@ -286,6 +313,8 @@ export default function MatchPage() {
   const turnLeft = left(view.turnRemainingMs)
   const pendingLeft = left(view.pendingRemainingMs)
   const reconnectLeft = left(view.opponentReconnectRemainingMs)
+  const nextGameLeft = left(view.nextGameRemainingMs)
+  const bo3 = view.bestOf === 3
   const sides: Side[] = view.you === 'O' ? ['O', 'X'] : ['X', 'O']
   const oppName = view.you ? (view.players[opposite(view.you)]?.name ?? 'opponent') : null
   const finished = view.status === 'finished'
@@ -296,6 +325,11 @@ export default function MatchPage() {
         <button onClick={toBracket} className="-ml-1 truncate px-1 text-left">
           ← {view.roundName} · #{view.id}
         </button>
+        {view.you === null && (
+          <span className="rounded-full border border-accent/50 bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
+            👁 Watching
+          </span>
+        )}
         <button onClick={toBracket} className="text-muted">
           Bracket
         </button>
@@ -307,7 +341,15 @@ export default function MatchPage() {
           const isYou = view.you === s
           const active = view.status === 'playing' && view.turn === s
           const label = isYou ? 'You' : p ? `${p.isBot ? '🤖 ' : ''}${p.name}` : 'TBD'
-          const status = active ? (isYou ? 'Your turn' : p?.isBot ? 'Thinking…' : 'Their turn') : 'Waiting'
+          const status = active
+            ? isYou
+              ? 'Your turn'
+              : p?.isBot
+                ? 'Thinking…'
+                : view.you
+                  ? 'Their turn'
+                  : 'To move'
+            : 'Waiting'
           const time = active ? (turnLeft === null ? '…' : clock(turnLeft)) : clock(TURN_MS)
           return (
             <div
@@ -321,6 +363,14 @@ export default function MatchPage() {
                 <b className="block truncate">{label}</b>
                 <span className="text-muted">{status}</span>
               </div>
+              {bo3 && (
+                <span
+                  aria-label={`${view.score[s]} games won`}
+                  className="flex-none rounded-md bg-panel2 px-1.5 py-0.5 text-xs font-bold tabular-nums"
+                >
+                  {view.score[s]}
+                </span>
+              )}
               <span
                 className={`ml-auto text-[15px] font-bold tabular-nums ${
                   active ? (turnLeft !== null && turnLeft <= 5_000 ? 'text-o' : '') : 'text-muted'
@@ -333,6 +383,20 @@ export default function MatchPage() {
         })}
       </div>
 
+      {view.lastGame && !finished && (
+        <div className="rounded-[10px] border border-accent/50 bg-accent/15 px-2.5 py-2 text-center text-xs">
+          <b>
+            Game {view.gameNo}:{' '}
+            {view.you
+              ? view.lastGame.winner === view.you
+                ? 'you win'
+                : 'you lose'
+              : `${view.players[view.lastGame.winner]?.name ?? '?'} wins`}
+          </b>{' '}
+          · {loserReason(view.players[opposite(view.lastGame.winner)]?.name ?? '?')[view.lastGame.endReason]} · Game{' '}
+          {view.gameNo + 1} starts in {Math.ceil((nextGameLeft ?? 0) / 1000)}s, sides swap
+        </div>
+      )}
       {view.opponentDisconnected && reconnectLeft !== null && (
         <div className="rounded-[10px] border border-[#78591a] bg-[#3a2a0b] px-2.5 py-2 text-xs text-amber-200">
           ⚠ Opponent disconnected: {Math.ceil(reconnectLeft / 1000)}s to reconnect, otherwise they forfeit.
@@ -349,27 +413,35 @@ export default function MatchPage() {
         winLine={view.winLine}
         you={view.you}
         turn={view.turn}
-        disabled={inFlight || view.status !== 'playing'}
+        disabled={inFlight || view.status !== 'playing' || view.turn === null}
         onPlay={(c) => void play(c)}
       />
 
       <div className="flex items-center justify-between gap-2 text-xs text-muted">
-        <span>Move {view.moves.length} · blocked-ends rule</span>
+        <span>
+          {bo3 ? `Game ${view.gameNo} of 3 · ` : ''}Move {view.moves.length}
+          {bo3 ? '' : ' · blocked-ends rule'}
+        </span>
         <span>#{view.id}</span>
         {view.you && !finished ? (
           <button onClick={() => void resign()} className="text-[#fca5a5]">
             Resign
+          </button>
+        ) : finished && resultHidden ? (
+          <button onClick={() => setResultHidden(false)} className="text-accent">
+            Show result
           </button>
         ) : (
           <span />
         )}
       </div>
 
-      {finished && (
+      {finished && !resultHidden && (
         <Result
           view={view}
           onBracket={toBracket}
-          onNext={view.you && view.nextMatchId ? () => router.push(`/r/${code}/m/${view.nextMatchId}`) : null}
+          onNext={view.nextMatchId ? () => router.push(`/r/${code}/m/${view.nextMatchId}`) : null}
+          onClose={() => setResultHidden(true)}
         />
       )}
 
@@ -386,10 +458,12 @@ function Result({
   view,
   onBracket,
   onNext,
+  onClose,
 }: {
   view: MatchView
   onBracket: () => void
   onNext: (() => void) | null
+  onClose: () => void
 }) {
   const { you, winner, endReason } = view
   const winnerName = winner ? (view.players[winner]?.name ?? '?') : null
@@ -417,6 +491,13 @@ function Result({
       <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4 text-center shadow-xl">
         <div className="text-[40px]">{lost ? '😔' : view.nextStep === 'champion' ? '🏆' : '🎉'}</div>
         <div className="text-[22px] font-bold">{title}</div>
+        {view.bestOf === 3 && (
+          <div className="mt-1 text-[15px] font-bold tabular-nums">
+            {you
+              ? `${view.score[you]} – ${view.score[opposite(you)]}`
+              : `${view.players.X?.name ?? '?'} ${view.score.X} – ${view.score.O} ${view.players.O?.name ?? '?'}`}
+          </div>
+        )}
         <div className="mt-1.5 mb-3.5 text-[13px] text-muted">
           {[reason, next].filter(Boolean).join(' · ')}
         </div>
@@ -435,6 +516,9 @@ function Result({
           }`}
         >
           View bracket
+        </button>
+        <button onClick={onClose} className="mt-2 text-[13px] text-muted underline">
+          View board
         </button>
       </div>
     </div>

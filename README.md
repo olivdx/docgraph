@@ -7,7 +7,7 @@ It is for fun, not ranking: there is no ELO, and all tournament data is deleted 
 ## How it works
 
 - Next.js 16 (App Router) + TypeScript + Tailwind, MongoDB (native driver) as the single source of truth. Designed for Vercel: no long-lived processes, no WebSockets. Clients poll (about 1 s in a match, 3 s in lobby/bracket, 10 s on Home) and time-based rules (turn timeout, disconnect, bot moves) are settled lazily by whichever request touches the match.
-- Rules: 5 or more in a row wins unless both ends are blocked (the board edge counts as blocking). 100×100 board (−50..49), drag to pan (no zoom), 25 s per turn, 30 s reconnect grace after a 5 s detection window, one game per match.
+- Rules: 5 or more in a row wins unless both ends are blocked (the board edge counts as blocking). 100×100 board (−50..49), drag to pan (no zoom), 85 s per turn, 30 s reconnect grace after a 5 s detection window. The host picks Bo1 or Bo3 for every match (Bo3: first to 2, sides swap each game, the next game starts after a 3 s break).
 - 2 to 32 players. The bracket is rounded up to the next power of 2 and empty slots become bots (never bot-vs-bot in round 1). A human facing a bot plays X and moves first.
 - Identity is the Telegram `initData`, verified server-side with the bot token. No cookies or sessions.
 - Design spec: `docs/superpowers/specs/2026-11-02-caro-tournament-design.md`.

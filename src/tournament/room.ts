@@ -4,7 +4,7 @@ import { planBracket } from './bracket'
 import { randomCode } from './codes'
 import { FINISHED_TTL_MS, LOBBY_TTL_MS, MATCH_ID_LEN, MAX_PLAYERS, MIN_HUMANS } from './constants'
 import { applyMove, finishMatch, opposite, promoteIfReady, stepMatch, type Presence, type SettleOpts } from './match'
-import { RoomError, type ListedRoom, type Match, type Player, type Room } from './types'
+import { RoomError, type BestOf, type ListedRoom, type Match, type Player, type Room } from './types'
 
 /**
  * Room aggregate. Every exported function is pure: it never mutates its input and returns a new
@@ -36,6 +36,7 @@ export function createRoom(p: { code: string; host: UserInfo; name?: string; now
     name,
     hostId: p.host.userId,
     status: 'lobby',
+    bestOf: 1,
     players: [human(p.host, p.now)],
     totalRounds: 0,
     matches: [],
@@ -65,6 +66,15 @@ export function leaveRoom(room: Room, userId: string): Room {
   return r
 }
 
+/** Host only, lobby only: the match format for every match of the tournament. */
+export function setBestOf(room: Room, userId: string, bestOf: BestOf): Room {
+  if (userId !== room.hostId) throw new RoomError('not_host')
+  if (room.status !== 'lobby') throw new RoomError('not_lobby')
+  const r = structuredClone(room)
+  r.bestOf = bestOf
+  return r
+}
+
 export function cancelRoom(room: Room, userId: string, now: number): Room {
   if (userId !== room.hostId) throw new RoomError('not_host')
   if (room.status !== 'lobby') throw new RoomError('not_lobby')
@@ -90,6 +100,8 @@ function emptyMatch(id: string, round: number, slot: number, kind: Match['kind']
     startedAt: null,
     readyAt: { X: null, O: null },
     moves: [],
+    games: [],
+    nextGameAt: null,
     turnDeadlineAt: null,
     botMoveDueAt: null,
     winner: null,
@@ -244,6 +256,7 @@ export function playMove(
     if (m.status === 'finished' && wasPlaying(room, matchId)) return r
     throw new RoomError('not_playing')
   }
+  if (m.nextGameAt !== null) throw new RoomError('not_playing') // break between games
   if (!side || sideToMove(m.moves) !== side) throw new RoomError('not_your_turn')
   if (!isInside(cell.x, cell.y)) throw new RoomError('out_of_bounds')
   if (m.moves.some((mv) => mv.x === cell.x && mv.y === cell.y)) throw new RoomError('occupied')
@@ -273,6 +286,16 @@ export function resign(
   finishMatch(r, m, opposite(side), 'resign', now, rng)
   settleInPlace(r, presence ?? null, now, rng, opts)
   return r
+}
+
+/** Fills fields added after a room may have been stored (Bo3): such rooms read as Bo1. Mutates and returns `room`. */
+export function normalizeRoom(room: Room): Room {
+  room.bestOf ??= 1
+  for (const m of room.matches) {
+    m.games ??= []
+    m.nextGameAt ??= null
+  }
+  return room
 }
 
 // ---- queries -----------------------------------------------------------------------------------

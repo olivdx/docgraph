@@ -18,6 +18,8 @@ function client(): Ably.Rest | null {
 
 export const realtimeEnabled = () => !!process.env.ABLY_API_KEY
 
+import { CHANGED_EVENT, MOVE_EVENT, type MoveSignal } from '@/src/realtime/channels'
+
 export { caroMatchChannel, caroRoomChannel, sudokuChannel } from '@/src/realtime/channels'
 
 /** Publishes a "changed" signal on each channel. Never throws: realtime is best-effort, polling covers misses. */
@@ -28,10 +30,20 @@ export async function publishChanged(channels: string[], version: number): Promi
     channels.map((name) =>
       c.channels
         .get(name)
-        .publish('changed', { v: version })
+        .publish(CHANGED_EVENT, { v: version })
         .catch((e: unknown) => console.error('ably publish failed', name, e)),
     ),
   )
+}
+
+/** Publishes a move signal (see MoveSignal). Never throws: polling and the doorbell cover misses. */
+export async function publishMove(channel: string, signal: MoveSignal): Promise<void> {
+  const c = client()
+  if (!c) return
+  await c.channels
+    .get(channel)
+    .publish(MOVE_EVENT, signal)
+    .catch((e: unknown) => console.error('ably publish failed', channel, e))
 }
 
 /** A signed token request the browser exchanges with Ably: subscribe-only on game channels, 1 hour. */

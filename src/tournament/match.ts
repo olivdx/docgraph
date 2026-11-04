@@ -7,6 +7,7 @@ import {
   BOT_DELAY_MIN_MS,
   BOT_TIME_BUDGET_MS,
   DISCONNECT_DETECT_MS,
+  GAME_BREAK_MS,
   MAX_BOT_GAME_MOVES,
   NO_SHOW_MS,
   RECONNECT_GRACE_MS,
@@ -107,6 +108,56 @@ function advance(room: Room, m: Match, rng: Rng): void {
   }
 }
 
+/** Game wins a player needs to take the match. */
+export const winsNeeded = (room: Pick<Room, 'bestOf'>): number => ((room.bestOf ?? 1) === 3 ? 2 : 1)
+
+/** Completed games won by `userId` in this match. */
+export const gameWins = (m: Pick<Match, 'games'>, userId: string | null): number =>
+  userId ? (m.games ?? []).filter((g) => g.winner === userId).length : 0
+
+/** 1-based number of the current game (during a break or once finished: the last one played). */
+export function gameNumber(m: Pick<Match, 'games' | 'nextGameAt' | 'status'>): number {
+  const played = (m.games ?? []).length
+  return m.status === 'finished' || m.nextGameAt != null ? Math.max(1, played) : played + 1
+}
+
+/**
+ * Ends the current game: records it, then either finishes the match (the winner has enough game
+ * wins) or opens the break before the next game. A bot-vs-bot series skips the break and plays on
+ * at once. Returns true if the match finished.
+ */
+function finishGame(
+  room: Room,
+  m: Match,
+  winner: Side,
+  reason: EndReason,
+  at: number,
+  rng: Rng,
+  winLine: Cell[] | null = null,
+): boolean {
+  const winnerId = m[winner]!
+  m.games.push({ winner: winnerId, endReason: reason, finishedAt: at })
+  if (gameWins(m, winnerId) >= winsNeeded(room)) {
+    finishMatch(room, m, winner, reason, at, rng, winLine)
+    return true
+  }
+  m.winLine = winLine
+  m.turnDeadlineAt = null
+  m.botMoveDueAt = null
+  m.nextGameAt = at + GAME_BREAK_MS
+  if (isBotId(room, m.X) && isBotId(room, m.O)) return startNextGame(room, m, at, rng)
+  return false
+}
+
+/** Clears the board, swaps sides and starts the next game at `at`. Returns true if the match finished (bot-vs-bot). */
+function startNextGame(room: Room, m: Match, at: number, rng: Rng): boolean {
+  ;[m.X, m.O] = [m.O, m.X]
+  m.moves = []
+  m.winLine = null
+  m.nextGameAt = null
+  return beginGame(room, m, at, rng)
+}
+
 /** Finish a match and advance its entrants exactly once. */
 export function finishMatch(
   room: Room,
@@ -125,6 +176,7 @@ export function finishMatch(
   m.finishedAt = at
   m.turnDeadlineAt = null
   m.botMoveDueAt = null
+  m.nextGameAt = null
   advance(room, m, rng)
 }
 
@@ -139,19 +191,19 @@ function scheduleNext(room: Room, m: Match, at: number, rng: Rng): void {
   }
 }
 
-/** Places a stone and resolves a win. Returns true if the match finished. */
+/** Places a stone and resolves a win. Returns true if the game ended. */
 function placeStone(room: Room, m: Match, cell: Cell, side: Side, at: number, rng: Rng): boolean {
   const move = { x: cell.x, y: cell.y, side, at }
   m.moves.push(move)
   const win = findWin(buildBoard(m.moves), move)
   if (win) {
-    finishMatch(room, m, side, 'five_in_row', at, rng, win)
+    finishGame(room, m, side, 'five_in_row', at, rng, win)
     return true
   }
   return false
 }
 
-/** Applies a move to a playing match, then sets the next deadline if the game goes on. */
+/** Applies a move to a playing game, then sets the next deadline if the game goes on. */
 export function applyMove(room: Room, m: Match, cell: Cell, side: Side, at: number, rng: Rng): void {
   if (!placeStone(room, m, cell, side, at, rng)) scheduleNext(room, m, at, rng)
 }
@@ -159,21 +211,28 @@ export function applyMove(room: Room, m: Match, cell: Cell, side: Side, at: numb
 function startPlaying(room: Room, m: Match, at: number, rng: Rng): void {
   m.status = 'playing'
   m.startedAt = at
+  beginGame(room, m, at, rng)
+}
+
+/** Starts the current (empty) game at `at`. Returns true if the match finished (bot-vs-bot). */
+function beginGame(room: Room, m: Match, at: number, rng: Rng): boolean {
   if (isBotId(room, m.X) && isBotId(room, m.O)) {
-    // Bot vs bot: play the whole game right now, fast mode, no delays.
+    // Bot vs bot: play the whole game right now, fast mode, no delays (a series recurses through
+    // finishGame → startNextGame, at most three games deep).
     m.turnDeadlineAt = null
     m.botMoveDueAt = null
     for (;;) {
       if (m.moves.length >= MAX_BOT_GAME_MOVES) {
-        finishMatch(room, m, 'X', 'board_full', at, rng)
-        return
+        finishGame(room, m, 'X', 'board_full', at, rng)
+        return m.status === 'finished'
       }
       const side = sideToMove(m.moves)
       const cell = chooseBotMove(m.moves, side, { mode: 'fast', rng })
-      if (placeStone(room, m, cell, side, at, rng)) return
+      if (placeStone(room, m, cell, side, at, rng)) return m.status === 'finished'
     }
   }
   scheduleNext(room, m, at, rng)
+  return false
 }
 
 function disconnectDeadline(m: Match, presence: Record<string, number>, userId: string): number {
@@ -182,6 +241,7 @@ function disconnectDeadline(m: Match, presence: Record<string, number>, userId: 
 }
 
 type Due =
+  | { at: number; kind: 'next_game' }
   | { at: number; kind: 'turn' }
   | { at: number; kind: 'disconnect'; side: Side }
   | { at: number; kind: 'bot' }
@@ -219,6 +279,7 @@ export function stepMatch(
 
     case 'playing': {
       const due: Due[] = []
+      if (m.nextGameAt != null && m.nextGameAt <= now) due.push({ at: m.nextGameAt, kind: 'next_game' })
       if (m.turnDeadlineAt !== null && m.turnDeadlineAt <= now) due.push({ at: m.turnDeadlineAt, kind: 'turn' })
       if (presence) {
         for (const side of ['X', 'O'] as const) {
@@ -231,17 +292,19 @@ export function stepMatch(
       }
       if (m.botMoveDueAt !== null && m.botMoveDueAt <= now) due.push({ at: m.botMoveDueAt, kind: 'bot' })
       if (due.length === 0) return false
-      // earliest wins; ties keep push order (turn, disconnect X, disconnect O, bot)
+      // earliest wins; ties keep push order (next game, turn, disconnect X, disconnect O, bot)
       const ev = due.reduce((best, d) => (d.at < best.at ? d : best))
-      if (ev.kind === 'turn') {
-        finishMatch(room, m, opposite(sideToMove(m.moves)), 'turn_timeout', ev.at, rng)
+      if (ev.kind === 'next_game') {
+        startNextGame(room, m, ev.at, rng)
+      } else if (ev.kind === 'turn') {
+        finishGame(room, m, opposite(sideToMove(m.moves)), 'turn_timeout', ev.at, rng)
       } else if (ev.kind === 'disconnect') {
         finishMatch(room, m, opposite(ev.side), 'disconnect_timeout', ev.at, rng)
       } else {
         const scope = opts?.fullBotMatchId
         if (scope !== undefined && scope !== m.id && now - ev.at <= BOT_DEFER_MAX_MS) return false
         if (m.moves.length >= MAX_BOT_GAME_MOVES) {
-          finishMatch(room, m, 'X', 'board_full', ev.at, rng)
+          finishGame(room, m, 'X', 'board_full', ev.at, rng)
         } else {
           const side = sideToMove(m.moves)
           const cell = chooseBotMove(m.moves, side, { mode: 'full', timeBudgetMs: BOT_TIME_BUDGET_MS, rng })

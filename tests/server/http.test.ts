@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildInviteUrl, errorResponse, parseCreateBody, parseMoveBody } from '@/src/server/http'
+import { buildInviteUrl, errorResponse, parseCreateBody, parseFormatBody, parseMoveBody } from '@/src/server/http'
 import { RoomError } from '@/src/tournament/types'
 
 describe('errorResponse', () => {
@@ -72,5 +72,15 @@ describe('buildInviteUrl', () => {
     expect(buildInviteUrl('ABC123', { TELEGRAM_BOT_USERNAME: 'cupbot' })).toBe('')
     expect(buildInviteUrl('ABC123', { TELEGRAM_MINIAPP_SHORTNAME: 'cup' })).toBe('')
     expect(buildInviteUrl('ABC123', {})).toBe('')
+  })
+})
+
+describe('parseFormatBody', () => {
+  it('accepts 1 or 3 only', () => {
+    expect(parseFormatBody({ bestOf: 1 })).toBe(1)
+    expect(parseFormatBody({ bestOf: 3 })).toBe(3)
+    for (const bad of [{ bestOf: 2 }, { bestOf: '3' }, {}, null, undefined]) {
+      expect(() => parseFormatBody(bad)).toThrow()
+    }
   })
 })

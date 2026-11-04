@@ -13,6 +13,16 @@ export interface Player {
   joinedAt: number
 }
 
+export type BestOf = 1 | 3
+export const isBestOf = (v: unknown): v is BestOf => v === 1 || v === 3
+
+/** A completed game of a match (Bo3 has up to three). */
+export interface GameResult {
+  winner: string // userId
+  endReason: EndReason
+  finishedAt: number
+}
+
 export interface Match {
   id: string
   round: number
@@ -26,11 +36,18 @@ export interface Match {
   pendingSince: number | null
   startedAt: number | null
   readyAt: { X: number | null; O: number | null }
+  /** The current game's moves (during a break between games: the finished game's). */
   moves: Move[]
+  /** Completed games, in order. */
+  games: GameResult[]
+  /** End of the break before the next game (Bo3), else null. */
+  nextGameAt: number | null
   turnDeadlineAt: number | null
   botMoveDueAt: number | null
+  /** The match winner, as a side of the LAST game (sides swap per game), so `m[m.winner]` is their id. */
   winner: Side | null
   endReason: EndReason | null
+  /** The last game's winning line (kept through a break). */
   winLine: Cell[] | null
   finishedAt: number | null
 }
@@ -40,6 +57,7 @@ export interface Room {
   name: string
   hostId: string
   status: RoomStatus
+  bestOf: BestOf
   players: Player[]
   totalRounds: number
   matches: Match[]

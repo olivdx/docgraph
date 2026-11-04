@@ -1,4 +1,5 @@
 import type { Collection, Db } from 'mongodb'
+import { normalizeRoom } from '@/src/tournament/room'
 import type { ListedRoom, Room } from '@/src/tournament/types'
 
 export interface RoomStore {
@@ -95,7 +96,8 @@ export class MongoRoomStore implements RoomStore {
   }
 
   async get(code: string): Promise<Room | null> {
-    return this.col.findOne({ _id: code })
+    const r = await this.col.findOne({ _id: code })
+    return r ? normalizeRoom(r) : null
   }
 
   async insert(room: Room): Promise<boolean> {
@@ -125,7 +127,7 @@ export class MongoRoomStore implements RoomStore {
   }
 
   async findByPlayer(userId: string): Promise<Room[]> {
-    return this.col.find({ status: { $in: OPEN }, 'players.userId': userId }).toArray()
+    return (await this.col.find({ status: { $in: OPEN }, 'players.userId': userId }).toArray()).map(normalizeRoom)
   }
 }
 

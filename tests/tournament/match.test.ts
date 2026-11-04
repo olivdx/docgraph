@@ -73,7 +73,7 @@ function resolve(r: Room, m: Match, at: number): Room {
 }
 
 describe('match lifecycle (2-human room → one final)', () => {
-  it('pending → playing when both ready; X to move with 25s deadline', () => {
+  it('pending → playing when both ready; X to move with a TURN_MS deadline', () => {
     let r = startedRoom(2)
     const m0 = r.matches[0]
     expect(r.matches).toHaveLength(1)
@@ -112,12 +112,12 @@ describe('match lifecycle (2-human room → one final)', () => {
     expect(m.winner).toBe(seed(m.X) < seed(m.O) ? 'X' : 'O')
   })
 
-  it('turn timeout: X does nothing for 25_001ms → X loses turn_timeout', () => {
+  it('turn timeout: X does nothing for TURN_MS + 1 → X loses turn_timeout', () => {
     const r = ready(startedRoom(2))
     const id = r.matches[0].id
-    const p = { u0: START + 25_001, u1: START + 25_001 }
-    expect(settleRoom(r, p, START + 20_000, rng).changed).toBe(false)
-    const m = byId(settleRoom(r, p, START + 25_001, rng).room, id)
+    const p = { u0: START + TURN_MS + 1, u1: START + TURN_MS + 1 }
+    expect(settleRoom(r, p, START + TURN_MS - 1, rng).changed).toBe(false)
+    const m = byId(settleRoom(r, p, START + TURN_MS + 1, rng).room, id)
     expect(m.status).toBe('finished')
     expect(m.endReason).toBe('turn_timeout')
     expect(m.winner).toBe('O')
@@ -165,10 +165,11 @@ describe('match lifecycle (2-human room → one final)', () => {
   })
 
   it('earliest deadline wins when two expired', () => {
-    const r = ready(startedRoom(2)) // X to move, deadline START+25s
+    const r = ready(startedRoom(2)) // X to move, deadline START+TURN_MS
     const m0 = r.matches[0]
-    // O vanished at START → O's disconnect deadline START+35s; X is online.
-    const m = byId(settleRoom(r, { [m0.X!]: START + 40_000, [m0.O!]: START }, START + 40_000, rng).room, m0.id)
+    // O vanished at START+TURN_MS−30s → O's disconnect deadline START+TURN_MS+5s; X is online.
+    const at = START + TURN_MS + 10_000
+    const m = byId(settleRoom(r, { [m0.X!]: at, [m0.O!]: START + TURN_MS - 30_000 }, at, rng).room, m0.id)
     expect(m.endReason).toBe('turn_timeout')
     expect(m.winner).toBe('O')
     expect(m.finishedAt).toBe(START + TURN_MS)
@@ -351,21 +352,23 @@ describe('bracket progression', () => {
     let r = startedRoom(4, 2)
     const s0 = r.matches.find((m) => m.round === 0 && m.slot === 0)!
     const s1 = r.matches.find((m) => m.round === 0 && m.slot === 1)!
-    r = ready(r, s1, START) // slot 1 times out at START+25s
-    r = ready(r, s0, START + 20_000) // slot 0 times out at START+45s
-    const everyone = Object.fromEntries(r.players.map((p) => [p.userId, START + 100_000]))
-    const { room } = settleRoom(r, everyone, START + 100_000, rng)
-    expect(byId(room, s1.id).finishedAt).toBe(START + 25_000)
-    expect(byId(room, s0.id).finishedAt).toBe(START + 45_000)
+    r = ready(r, s1, START) // slot 1 times out at START+TURN_MS
+    r = ready(r, s0, START + 20_000) // slot 0 times out at START+20s+TURN_MS
+    const lastOut = START + 20_000 + TURN_MS
+    const at = lastOut + 55_000
+    const everyone = Object.fromEntries(r.players.map((p) => [p.userId, at]))
+    const { room } = settleRoom(r, everyone, at, rng)
+    expect(byId(room, s1.id).finishedAt).toBe(START + TURN_MS)
+    expect(byId(room, s0.id).finishedAt).toBe(lastOut)
     for (const m of [final(room), third(room)]) {
       expect(m.status).toBe('pending') // 55s ≤ NO_SHOW_MS: no no-show yet
-      expect(m.pendingSince).toBe(START + 45_000)
+      expect(m.pendingSince).toBe(lastOut)
     }
     expect(room.status).toBe('running')
     // ...and the no-show is measured from the correct moment.
-    const later = settleRoom(room, everyone, START + 105_001, rng).room
+    const later = settleRoom(room, everyone, lastOut + 60_001, rng).room
     expect(final(later).endReason).toBe('no_show')
-    expect(final(later).finishedAt).toBe(START + 105_000)
+    expect(final(later).finishedAt).toBe(lastOut + 60_000)
   })
 
   it('4-player bracket: semis losers meet in 3rd place; room finishes with placements', () => {

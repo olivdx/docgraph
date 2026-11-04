@@ -1,7 +1,9 @@
-export const TURN_MS = 25_000
+export const TURN_MS = 85_000
 export const RECONNECT_GRACE_MS = 30_000
 export const DISCONNECT_DETECT_MS = 5_000
 export const NO_SHOW_MS = 60_000
+/** Bo3: how long a finished game's board stays up before the next game starts. */
+export const GAME_BREAK_MS = 3_000
 export const MIN_HUMANS = 2
 export const MAX_PLAYERS = 32
 export const LOBBY_TTL_MS = 2 * 60 * 60 * 1000

@@ -2,9 +2,18 @@ import { sideToMove } from '@/src/game/rules'
 import type { Cell, Move, Side } from '@/src/game/types'
 import { roundName } from './bracket'
 import { DISCONNECT_DETECT_MS, NO_SHOW_MS, RECONNECT_GRACE_MS } from './constants'
-import { isBotId, opposite, sideOf, type Presence } from './match'
+import { gameNumber, gameWins, isBotId, opposite, sideOf, winsNeeded, type Presence } from './match'
 import { isActive } from './room'
-import { RoomError, type EndReason, type ListedRoom, type Match, type MatchStatus, type Room, type RoomStatus } from './types'
+import {
+  RoomError,
+  type BestOf,
+  type EndReason,
+  type ListedRoom,
+  type Match,
+  type MatchStatus,
+  type Room,
+  type RoomStatus,
+} from './types'
 
 export interface Entrant {
   name: string
@@ -26,8 +35,10 @@ export interface BracketMatchView {
   id: string
   a: Entrant | null
   b: Entrant | null
-  scoreA: 1 | 0 | null
-  scoreB: 1 | 0 | null
+  /** Games won (a forfeit credits the winner with the games needed); null before any game ended. */
+  scoreA: number | null
+  scoreB: number | null
+  winner: 'a' | 'b' | null
   status: MatchStatus
   isYours: boolean
 }
@@ -36,6 +47,7 @@ export interface RoomView {
   code: string
   name: string
   status: RoomStatus
+  bestOf: BestOf
   isHost: boolean
   players: { name: string; avatarUrl: string | null; isBot: boolean; seed: number | null; isHost: boolean }[]
   slotsIfStartedNow: number
@@ -56,6 +68,15 @@ export interface MatchView {
   you: Side | null
   players: { X: { name: string; isBot: boolean } | null; O: { name: string; isBot: boolean } | null }
   moves: Move[]
+  bestOf: BestOf
+  /** 1-based game number (during a break: the game just finished). */
+  gameNo: number
+  /** Games won, by side in the current game (a forfeit credits the winner with the games needed). */
+  score: { X: number; O: number }
+  /** During a break between games: who won the game just finished, and how. */
+  lastGame: { winner: Side; endReason: EndReason } | null
+  nextGameRemainingMs: number | null
+  /** null when no one is to move (not playing, or a break between games). */
   turn: Side | null
   turnRemainingMs: number | null
   pendingRemainingMs: number | null
@@ -68,6 +89,13 @@ export interface MatchView {
   /** The viewer's pending|playing match in this room other than this one (where to go next), else null. */
   nextMatchId: string | null
   serverNow: number
+}
+
+/** Games won by `userId` as shown: once the match is decided, the winner shows at least the games needed. */
+function shownWins(room: Pick<Room, 'bestOf'>, m: Match, userId: string | null): number {
+  const wins = gameWins(m, userId)
+  const won = m.status === 'finished' && m.winner !== null && m[m.winner] === userId
+  return won ? Math.max(wins, winsNeeded(room)) : wins
 }
 
 function nameOf(room: Pick<Room, 'players'>, userId: string | null): string {
@@ -107,13 +135,15 @@ export function toRoomView(room: Room, viewerId: string, now: number, inviteUrl:
 
   const rounds: RoomView['rounds'] = []
   const toBracket = (m: Match): BracketMatchView => {
-    const aWon = m.winner !== null && m[m.winner] === m.a
+    const decided = m.status === 'finished' && m.winner !== null
+    const scored = decided || (m.games ?? []).length > 0
     return {
       id: m.id,
       a: entrant(room, m.a),
       b: entrant(room, m.b),
-      scoreA: m.winner === null ? null : aWon ? 1 : 0,
-      scoreB: m.winner === null ? null : aWon ? 0 : 1,
+      scoreA: scored ? shownWins(room, m, m.a) : null,
+      scoreB: scored ? shownWins(room, m, m.b) : null,
+      winner: decided ? (m[m.winner!] === m.a ? 'a' : 'b') : null,
       status: m.status,
       isYours: m.a === viewerId || m.b === viewerId,
     }
@@ -135,6 +165,7 @@ export function toRoomView(room: Room, viewerId: string, now: number, inviteUrl:
     code: room._id,
     name: room.name,
     status: room.status,
+    bestOf: room.bestOf ?? 1,
     isHost: room.hostId === viewerId,
     players: room.players.map((p) => ({ name: p.name, avatarUrl: p.avatarUrl, isBot: p.isBot, seed: p.seed, isHost: p.userId === room.hostId })),
     slotsIfStartedNow: slots,
@@ -168,9 +199,10 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
   }
 
   const playing = m.status === 'playing'
-  const turn = playing ? sideToMove(m.moves) : null
+  const onBreak = playing && m.nextGameAt != null
+  const turn = playing && !onBreak ? sideToMove(m.moves) : null
   const humanToMove = turn !== null && !isBotId(room, m[turn])
-  const turnRemainingMs = playing && humanToMove && m.turnDeadlineAt !== null ? Math.max(0, m.turnDeadlineAt - now) : null
+  const turnRemainingMs = turn !== null && humanToMove && m.turnDeadlineAt !== null ? Math.max(0, m.turnDeadlineAt - now) : null
   const pendingRemainingMs = m.status === 'pending' && m.pendingSince !== null ? Math.max(0, m.pendingSince + NO_SHOW_MS - now) : null
 
   let opponentDisconnected = false
@@ -193,6 +225,11 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
     you,
     players: { X: side(m.X), O: side(m.O) },
     moves: m.moves,
+    bestOf: room.bestOf ?? 1,
+    gameNo: gameNumber(m),
+    score: { X: shownWins(room, m, m.X), O: shownWins(room, m, m.O) },
+    lastGame: onBreak ? lastGameOf(m) : null,
+    nextGameRemainingMs: onBreak ? Math.max(0, m.nextGameAt! - now) : null,
     turn,
     turnRemainingMs,
     pendingRemainingMs,
@@ -211,4 +248,10 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
       )?.id ?? null,
     serverNow: now,
   }
+}
+
+function lastGameOf(m: Match): MatchView['lastGame'] {
+  const g = (m.games ?? []).at(-1)
+  const side = g ? sideOf(m, g.winner) : null
+  return g && side ? { winner: side, endReason: g.endReason } : null
 }

@@ -7,6 +7,7 @@ import { roomPath } from '@/src/client/routes'
 import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import { caroRoomChannel } from '@/src/realtime/channels'
+import type { BestOf } from '@/src/tournament/types'
 import type { BracketMatchView, Entrant, RoomView } from '@/src/tournament/views'
 
 const AVATAR_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
@@ -118,6 +119,22 @@ function Room() {
     [busy, code, refresh, router],
   )
 
+  const setFormat = useCallback(
+    async (bestOf: BestOf) => {
+      if (busy || view?.bestOf === bestOf) return
+      setBusy(true)
+      try {
+        setOverride(await apiPost<RoomView>(`/api/rooms/${code}/format`, { bestOf }))
+      } catch {
+        setToast('Could not change the format. Try again.')
+        refresh()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [busy, view?.bestOf, code, refresh],
+  )
+
   if (!view) {
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 p-4 text-sm text-muted">
@@ -157,7 +174,7 @@ function Room() {
         </div>
       )}
 
-      {view.status === 'lobby' && <Lobby view={view} busy={busy} readOnly={blockedBy !== null} act={act} />}
+      {view.status === 'lobby' && <Lobby view={view} busy={busy} readOnly={blockedBy !== null} act={act} onFormat={setFormat} />}
       {view.status === 'running' && <Bracket view={view} onEnter={enter} />}
       {view.status === 'finished' && (
         <>
@@ -206,11 +223,13 @@ function Lobby({
   busy,
   readOnly,
   act,
+  onFormat,
 }: {
   view: RoomView
   busy: boolean
   readOnly: boolean
   act: (a: 'start' | 'cancel' | 'leave') => void
+  onFormat: (bestOf: BestOf) => void
 }) {
   const humans = view.players.filter((p) => !p.isBot).length
   return (
@@ -225,6 +244,35 @@ function Lobby({
           >
             ↗ Share invite link
           </button>
+        )}
+      </div>
+
+      <div className={`${CARD} flex items-center justify-between gap-3 py-3`}>
+        <div className="min-w-0">
+          <b className="text-sm">Match format</b>
+          <div className="text-xs text-muted">
+            {view.bestOf === 3 ? 'Best of 3: first to 2 wins, sides swap each game' : 'One game per match'}
+          </div>
+        </div>
+        {view.isHost && !readOnly ? (
+          <div className="flex flex-none rounded-lg border border-line bg-panel2 p-0.5" role="group" aria-label="Match format">
+            {([1, 3] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={busy}
+                aria-pressed={view.bestOf === n}
+                onClick={() => onFormat(n)}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                  view.bestOf === n ? 'bg-accent text-white' : 'text-muted'
+                }`}
+              >
+                Bo{n}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="flex-none text-sm font-semibold">Bo{view.bestOf}</span>
         )}
       </div>
 
@@ -276,10 +324,7 @@ function Lobby({
   )
 }
 
-function Slot({ e, score, other }: { e: Entrant | null; score: 1 | 0 | null; other: 1 | 0 | null }) {
-  const decided = score !== null && other !== null
-  const won = decided && score === 1
-  const lost = decided && score === 0
+function Slot({ e, score, won, lost }: { e: Entrant | null; score: number | null; won: boolean; lost: boolean }) {
   return (
     <div className={`flex justify-between gap-1 px-2 py-1.5 ${lost || !e ? 'text-[#7d8ba3]' : ''}`}>
       <span className={`truncate ${won ? 'font-bold text-white' : ''}`}>
@@ -298,24 +343,31 @@ function Slot({ e, score, other }: { e: Entrant | null; score: 1 | 0 | null; oth
   )
 }
 
-function MatchCard({ m }: { m: BracketMatchView }) {
+function MatchCard({ m, onOpen }: { m: BracketMatchView; onOpen: (id: string) => void }) {
   const live = m.status === 'playing'
+  // Live and finished matches open the board: your own to play, anyone else's to watch.
+  const openable = live || m.status === 'finished'
   return (
-    <div
-      className={`w-[132px] rounded-md border bg-[#1a2537] text-xs ${
+    <button
+      type="button"
+      disabled={!openable}
+      onClick={() => onOpen(m.id)}
+      aria-label={openable ? `${m.isYours ? 'Open' : 'Watch'} match #${m.id}` : undefined}
+      className={`block w-[132px] rounded-md border bg-[#1a2537] text-left text-xs enabled:active:scale-[0.98] ${
         m.isYours ? 'border-accent shadow-[0_0_0_1px_var(--accent)]' : 'border-line'
       }`}
     >
-      <Slot e={m.a} score={m.scoreA} other={m.scoreB} />
+      <Slot e={m.a} score={m.scoreA} won={m.winner === 'a'} lost={m.winner === 'b'} />
       <div className="border-t border-[#2a3850]">
-        <Slot e={m.b} score={m.scoreB} other={m.scoreA} />
+        <Slot e={m.b} score={m.scoreB} won={m.winner === 'b'} lost={m.winner === 'a'} />
       </div>
       {live && (
-        <div className="border-t border-dashed border-[#2a3850] px-2 py-[3px] text-[10px] text-amber-400">
-          ● Live{m.isYours ? ` · #${m.id}` : ''}
+        <div className="flex border-t border-dashed border-[#2a3850] px-2 py-[3px] text-[10px] text-amber-400">
+          <span className="flex-1">● Live{m.isYours ? ` · #${m.id}` : ''}</span>
+          {!m.isYours && <span className="text-accent">👁 Watch</span>}
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
@@ -324,14 +376,17 @@ function Bracket({ view, onEnter }: { view: RoomView; onEnter: (id: string) => v
   const oppIsBot = ym ? view.players.some((p) => p.isBot && p.name === ym.opponentName) : false
   return (
     <>
-      <div className="text-[19px] font-bold">Bracket</div>
+      <div className="flex items-baseline justify-between">
+        <div className="text-[19px] font-bold">Bracket</div>
+        <span className="text-[13px] text-muted">{view.bestOf === 3 ? 'Best of 3' : 'Best of 1'}</span>
+      </div>
       <div className="-mx-4 overflow-x-auto px-4 pb-1.5">
         <div className="flex w-max items-center gap-[18px]">
           {view.rounds.map((r) => (
             <div key={r.name} className="flex flex-col gap-3.5">
               <h4 className="mb-1 rounded-md bg-panel2 p-[7px] text-center text-xs font-semibold">{r.name}</h4>
               {r.matches.map((m) => (
-                <MatchCard key={m.id} m={m} />
+                <MatchCard key={m.id} m={m} onOpen={onEnter} />
               ))}
             </div>
           ))}

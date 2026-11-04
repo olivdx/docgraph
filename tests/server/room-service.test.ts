@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MemoryPresenceStore, MemoryRoomStore, type RoomStore } from '@/src/server/stores'
 import { RoomService } from '@/src/server/room-service'
 import type { TelegramUser } from '@/src/server/telegram-auth'
+import { TURN_MS } from '@/src/tournament/constants'
 import { RoomError, type Room } from '@/src/tournament/types'
 import { mulberry } from '../tournament/helpers'
 
@@ -143,7 +144,7 @@ describe('RoomService', () => {
     expect(again).toEqual(before)
     expect(before.moves.length).toBe(2)
     expect(before.turn).toBe('X')
-    expect(before.turnRemainingMs).toBe(22_000)
+    expect(before.turnRemainingMs).toBe(TURN_MS - 3000)
 
     // gone ~20 s during the opponent's turn: still in the game, board unchanged
     clock.t += 1000
@@ -154,7 +155,28 @@ describe('RoomService', () => {
     expect(back.status).toBe('playing')
     expect(back.moves.length).toBe(3)
     expect(back.turn).toBe('O')
-    expect(back.turnRemainingMs).toBe(5_000)
+    expect(back.turnRemainingMs).toBe(TURN_MS - 20_000)
+  })
+
+  it('anyone can watch a match: same board, no seat, no presence, cannot play', async () => {
+    const ctx = setup()
+    const { svc, clock, presence } = ctx
+    const code = await startedRoom(ctx, 2)
+    const m = (await loadRoom(ctx, code)).matches[0]
+    const X = tg(Number(m.X!.slice(1)))
+    const O = tg(Number(m.O!.slice(1)))
+    await svc.getMatch(code, m.id, X)
+    await svc.getMatch(code, m.id, O)
+    clock.t += 1000
+    const played = await svc.move(code, m.id, X, { x: 0, y: 0 }, 0)
+
+    const watcher = tg(99) // not in the tournament at all
+    const seen = await svc.getMatch(code, m.id, watcher)
+    expect(seen.you).toBeNull()
+    expect(seen.moves).toEqual(played.moves)
+    expect(seen.turn).toBe('O')
+    expect(await presence.get(code, [watcher.id])).toEqual({})
+    expect((await errCode(svc.move(code, m.id, watcher, { x: 1, y: 1 }, 1))).code).toBe('not_participant')
   })
 
   it('concurrent settles produce one result', async () => {
@@ -190,12 +212,19 @@ describe('RoomService', () => {
     clock.t += 1000
     await svc.move(code, semi.id, tg(Number(semi.X!.slice(1))), { x: 3, y: 3 }, 0)
     room = await loadRoom(ctx, code)
-    const v0 = room.version
     const finalBefore = room.matches.find((m) => m.kind === 'normal' && m.round === 1)!
     expect(finalBefore.a).toBeNull()
 
-    // O never moves: its turn deadline expires. Both pollers settle it at once.
-    clock.t += 26_000
+    // The other semi starts 1 s later, so it's still playing when this one's deadline passes.
+    const other = room.matches.find((m) => m.round === 0 && m.slot === 1)!
+    clock.t += 1000
+    for (const id of [other.X!, other.O!]) await svc.getMatch(code, other.id, tg(Number(id.slice(1))))
+    room = await loadRoom(ctx, code)
+    const v0 = room.version
+
+    // O never moves: its turn deadline expires (everyone stays online). Both pollers settle it at once.
+    clock.t += TURN_MS - 500
+    for (const id of [semi.X!, semi.O!, other.X!, other.O!]) await ctx.presence.touch(code, id, clock.t)
     store.okReplaces = 0
     store.failedReplaces = 0
     store.gate.enabled = true
@@ -327,11 +356,12 @@ describe('RoomService', () => {
     clock.t += 1000
     await svc.move(code, m.id, X, { x: 5, y: 5 }, 0)
     clock.t += 1000
-    await svc.move(code, m.id, O, { x: 6, y: 6 }, 1) // X deadline = T0 + 27s
+    await svc.move(code, m.id, O, { x: 6, y: 6 }, 1) // X deadline = T0 + 2s + TURN_MS
     const v0 = (await loadRoom(ctx, code)).version
     store.replaces = 0
 
-    clock.t = T0 + 30_000 // past the deadline, nobody settled yet
+    clock.t = T0 + TURN_MS + 5000 // past the deadline, nobody settled yet (both still online)
+    await ctx.presence.touch(code, O.id, clock.t)
     const view = await svc.move(code, m.id, X, { x: 7, y: 7 }, 2)
     expect(view.status).toBe('finished')
     expect(view.endReason).toBe('turn_timeout')
@@ -344,7 +374,7 @@ describe('RoomService', () => {
     const sm = saved.matches[0]
     expect(sm.status).toBe('finished')
     expect(sm.endReason).toBe('turn_timeout')
-    expect(sm.finishedAt).toBe(T0 + 27_000)
+    expect(sm.finishedAt).toBe(T0 + 2000 + TURN_MS)
 
     // late resign on an already-settled match is not_playing (nothing left to settle, no write)
     expect((await errCode(svc.resign(code, m.id, X))).code).toBe('not_playing')
@@ -360,7 +390,9 @@ describe('RoomService', () => {
     const O = tg(Number(m.O!.slice(1)))
     await svc.getMatch(code, m.id, X)
     await svc.getMatch(code, m.id, O)
-    clock.t += 26_000 // X never moved: X loses on time at T0 + 25s
+    clock.t += TURN_MS + 1000 // X never moved (but stayed online): X loses on time at T0 + TURN_MS
+    await ctx.presence.touch(code, X.id, clock.t)
+    await ctx.presence.touch(code, O.id, clock.t)
     const view = await svc.resign(code, m.id, O)
     expect(view.status).toBe('finished')
     expect(view.endReason).toBe('turn_timeout')
@@ -380,7 +412,8 @@ describe('RoomService', () => {
     const v0 = (await loadRoom(ctx, code)).version
     store.replaces = 0
 
-    clock.t += 26_000 // semi1: X's turn deadline expired; semi2 still pending (no-show at 60s)
+    clock.t += TURN_MS + 1000 // semi1: X's turn deadline expired (both online); semi2 no-shows too
+    for (const id of [semi1.X!, semi1.O!]) await ctx.presence.touch(code, id, clock.t)
     const err = await errCode(svc.move(code, semi2.id, tg(Number(semi2.X!.slice(1))), { x: 1, y: 1 }, 0))
     expect(err.code).toBe('not_playing')
     expect(store.replaces).toBe(1)
@@ -392,7 +425,7 @@ describe('RoomService', () => {
     expect(room.expiresAt.getTime()).toBe(clock.t + 2 * 60 * 60 * 1000)
 
     // command error with nothing to settle: no write
-    clock.t += 26_000 // semi1 already finished; semi2 pending for 52s (< 60s no-show)
+    clock.t += 26_000 // both semis settled; the final has been pending only 26s (< 60s no-show)
     expect((await errCode(svc.start(code, tg(1)))).code).toBe('not_lobby')
     expect(store.replaces).toBe(1)
   })

@@ -24,7 +24,6 @@ It's for fun, not ranking. Nothing about the players is kept once a tournament i
 **Non-goals**
 - 1v1 quick match or private 1v1 rooms. The app is tournaments only.
 - ELO, rankings, match history, player profiles.
-- Spectating someone else's live game (people can only see the bracket).
 - Telegram bot messages or notifications ("your match is ready"). There is no bot webhook. Players learn their match is ready only inside the app.
 - Multi-game series. Every match is one game.
 
@@ -45,7 +44,7 @@ It's for fun, not ranking. Nothing about the players is kept once a tournament i
 | Bracket size | Round up to the next power of 2. Empty slots become bots. |
 | Bots | A real player paired with a bot plays a real game against it. Bot strength is set to "you have to genuinely try to win." |
 | Match format | One game per match. |
-| Rules | 5 in a row wins **unless both ends are blocked**. 25 s per turn (timeout = loss). 30 s reconnect grace (expiry = loss). |
+| Rules | 5 in a row wins **unless both ends are blocked**. 85 s per turn (was 25 s until 2026-11-04) (timeout = loss). 30 s reconnect grace (expiry = loss). |
 | Storage | MongoDB (existing Atlas cluster). Tournament data is deleted after the tournament ends. No ELO. |
 | Hosting | Vercel |
 | Language | English UI |
@@ -90,10 +89,28 @@ Vercel has no long-lived processes and no WebSocket server, so:
 - When both sides are ready, the match switches to `playing` and the first turn clock starts.
 - **No-show rule:** if a human hasn't opened the match within 60 s of it becoming `pending`, they forfeit with `endReason: no_show`. If both no-show, the higher seed advances.
 
+### Watching matches, added 2026-11-04 (owner decision)
+
+- Anyone who can open the room (players, eliminated players, outsiders via the link) can tap a live or finished match in the bracket to watch it. Caro only: Sudoku stays progress-bars-only.
+- Watching uses the same match screen read-only: a "👁 Watching" badge, no Resign, and no presence heartbeat (a watcher's polls never count as a player being online). Only the two players can place stones (`not_participant` otherwise).
+- A watcher whose own match becomes ready is taken to it, as players are.
+- The result panel has "View board" so the final position can be inspected.
+
+### Match format Bo1 / Bo3, added 2026-11-04 (owner decision)
+
+- Owner: the host picks **Bo1 or Bo3** in the lobby, before Start; it applies to every match of every round (3rd place included, bot matches included). Default Bo1 (Claude's call); locked once the tournament starts.
+- Owner: Bo3 = first to 2 game wins; game 3 only at 1–1. Sides swap every game (X of the last game plays O, and X always moves first). The next game starts **automatically**, no ready check.
+- Claude's calls, confirmed by the owner:
+  - Between games: the finished game's board and result stay up for 3 s (`GAME_BREAK_MS`), then the board clears, sides swap and the next game starts with a fresh turn clock. The match stays `playing` during the break; disconnect deadlines keep running.
+  - Turn timeout (and the bot-game move cap) lose **that game** only. Resign, disconnect timeout and no-show lose **the whole match**; the winner is then credited with the games needed (shown like a walkover, e.g. 2–1).
+  - The match screen shows the format, game number and game score; the bracket shows game scores (Bo1 stays 1–0). Bot-vs-bot series resolve instantly, like bot-vs-bot games today.
+- Implementation notes: `room.bestOf: 1 | 3`; `match.games: { winner (userId), endReason, finishedAt }[]` (completed games only) and `match.nextGameAt` (break deadline, else null). `match.winner`/`endReason` describe the match and are set only when it ends (`winLine` is the last game's line, kept through the break); since sides swap, `match.winner` is a side in the **last** game's mapping, so `m[m.winner]` stays the winner's id. `POST /api/rooms/<code>/format { bestOf }` (host, lobby only). Move signals carry the game number so a stale game-1 signal never lands on game 2.
+
 ### Realtime (Ably), added 2026-11-04
 
 - Ably is a doorbell, not a data channel. After every successful write the server publishes `changed` with `{ v: version }` on the affected channels: `caro:<code>` when the lobby/bracket shape changes, `caro:<code>:<matchId>` for each match that changed, and `sudoku:<code>` for any Sudoku room write. Clients re-fetch through the normal API, so MongoDB stays the single source of truth and no game data (or Sudoku solution) goes through Ably.
 - Publishing runs in Next's `after()`, so a move's response never waits on Ably. Failures are logged and ignored.
+- Exception, for speed (2026-11-04): a validated human move in a human-vs-human match is also published as `move` with `{ matchId, from, moves, turnRemainingMs }` on the match channel, started *before* the write (in parallel with it). The opponent and spectators draw it at once, without a fetch. It can be lost (CAS conflict, deadline passed); the `changed` doorbell after the write and polling bring the stored truth. For 3 s after drawing a signalled move the client ignores fetched views that lack it (read before the write); after that the stored state wins, so a lost move disappears. Bot moves and Sudoku don't use it.
 - `GET /api/realtime/token` (Telegram-authenticated) returns a signed Ably token request: subscribe-only on `caro:*` and `sudoku:*`, 1 hour. Clients can't publish. Without `ABLY_API_KEY` the endpoint returns 404, the client never loads the SDK, and everything runs on polling alone.
 - While the channel is live, polling relaxes: lobby/bracket 3 s → 15 s, Sudoku room 2 s → 5 s. The Caro match screen goes 1 s → 2 s vs a human (it's still the presence heartbeat; disconnects show after 5 s), with an extra fetch just after each known deadline. It stays at 1 s vs a bot, because a bot reply is only played when a request settles the match.
 - After a realtime reconnect, the screen re-fetches once to cover missed signals.

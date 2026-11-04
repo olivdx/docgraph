@@ -1,12 +1,13 @@
 import { after } from 'next/server'
-import { publishChanged, realtimeEnabled } from './realtime'
+import { publishChanged, publishMove, realtimeEnabled } from './realtime'
+import type { MoveSignal } from '@/src/realtime/channels'
 import { RoomService } from './room-service'
 import { getDb } from './db'
 import { MongoPresenceStore, MongoRoomStore } from './stores'
 import { SudokuService } from './sudoku-service'
 import { MongoSudokuStore } from './sudoku-store'
 import { isDifficulty, type Difficulty } from '@/src/sudoku/types'
-import { RoomError } from '@/src/tournament/types'
+import { isBestOf, RoomError, type BestOf } from '@/src/tournament/types'
 
 /** `https://t.me/<bot>/<app>?startapp=<code>`, or '' when the bot username or app short name is not configured. */
 export function buildInviteUrl(code: string, env: Partial<Record<string, string>> = process.env): string {
@@ -20,6 +21,13 @@ export function buildInviteUrl(code: string, env: Partial<Record<string, string>
 function notify(channels: string[], version: number): void {
   if (!realtimeEnabled()) return
   after(() => publishChanged(channels, version))
+}
+
+/** Starts publishing a move right now (before the write); `after` only keeps the function alive until it lands. */
+function notifyMove(channel: string, signal: MoveSignal): void {
+  if (!realtimeEnabled()) return
+  const sent = publishMove(channel, signal)
+  after(() => sent)
 }
 
 interface Services {
@@ -41,6 +49,7 @@ function getServices(): Promise<Services> {
         inviteUrl: (code) => buildInviteUrl(code),
         activeElsewhere: (userId) => out.sudoku.activeCode(userId),
         notify,
+        notifyMove,
       })
       out.sudoku = new SudokuService({
         rooms: new MongoSudokuStore(db),
@@ -94,6 +103,11 @@ export function parseMoveBody(json: unknown): { x: number; y: number; clientMove
   const { x, y, clientMoveNo } = json
   if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(clientMoveNo)) throw badRequest()
   return { x: x as number, y: y as number, clientMoveNo: clientMoveNo as number }
+}
+
+export function parseFormatBody(json: unknown): BestOf {
+  if (!isObject(json) || !isBestOf(json.bestOf)) throw badRequest()
+  return json.bestOf
 }
 
 export function parseCreateBody(json: unknown): string | undefined {

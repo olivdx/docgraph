@@ -182,3 +182,56 @@ describe('MatchView', () => {
     expect(next(final, semiA.X!)).toBeNull()
   })
 })
+
+describe('Bo3 in views', () => {
+  function bo3Final() {
+    const r = started(2)
+    r.bestOf = 3
+    const m = r.matches[0]
+    m.readyAt = { X: T0, O: T0 }
+    m.status = 'playing'
+    m.startedAt = T0
+    return { r, m }
+  }
+
+  it('in a game: format, game number, score by current side, turn and clock', () => {
+    const { r, m } = bo3Final()
+    m.games = [{ winner: m.O!, endReason: 'five_in_row', finishedAt: T0 + 1 }]
+    m.turnDeadlineAt = T0 + 1000 + TURN_MS
+    const v = toMatchView(r, m.id, m.X!, T0 + 1000, {})
+    expect(v).toMatchObject({ bestOf: 3, gameNo: 2, score: { X: 0, O: 1 }, turn: 'X', turnRemainingMs: TURN_MS, lastGame: null, nextGameRemainingMs: null })
+  })
+
+  it('in a break: no turn, the finished game and the countdown to the next', () => {
+    const { r, m } = bo3Final()
+    m.games = [{ winner: m.X!, endReason: 'turn_timeout', finishedAt: T0 + 500 }]
+    m.nextGameAt = T0 + 500 + 3000
+    const v = toMatchView(r, m.id, m.O!, T0 + 1000, {})
+    expect(v).toMatchObject({ status: 'playing', gameNo: 1, score: { X: 1, O: 0 }, turn: null, turnRemainingMs: null })
+    expect(v.lastGame).toEqual({ winner: 'X', endReason: 'turn_timeout' })
+    expect(v.nextGameRemainingMs).toBe(2500)
+  })
+
+  it('a forfeit credits the winner with the games needed; the bracket shows game scores', () => {
+    const { r, m } = bo3Final()
+    m.games = [{ winner: m.X!, endReason: 'five_in_row', finishedAt: T0 + 1 }]
+    finishMatch(r, m, 'O', 'resign', T0 + 2, mulberry(1))
+    expect(toMatchView(r, m.id, m.X!, T0 + 3, {}).score).toEqual({ X: 1, O: 2 })
+    const card = toRoomView(r, 'u0', T0 + 3, INV).rounds[0].matches[0]
+    const aIsO = m.a === m.O
+    expect([card.scoreA, card.scoreB]).toEqual(aIsO ? [2, 1] : [1, 2])
+    expect(card.winner).toBe(aIsO ? 'a' : 'b')
+    expect(toRoomView(r, 'u0', T0, INV).bestOf).toBe(3)
+  })
+
+  it('Bo1 bracket: 1–0 once decided, no score before', () => {
+    const r = started(2)
+    const m = r.matches[0]
+    expect(toRoomView(r, 'u0', T0, INV).rounds[0].matches[0]).toMatchObject({ scoreA: null, scoreB: null, winner: null })
+    finishMatch(r, m, 'X', 'no_show', T0 + 1, mulberry(1))
+    const card = toRoomView(r, 'u0', T0 + 2, INV).rounds[0].matches[0]
+    const aWon = m.a === m.X
+    expect([card.scoreA, card.scoreB]).toEqual(aWon ? [1, 0] : [0, 1])
+    expect(toMatchView(r, m.id, m.X!, T0 + 2, {})).toMatchObject({ bestOf: 1, gameNo: 1, score: { X: 1, O: 0 } })
+  })
+})

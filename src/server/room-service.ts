@@ -9,11 +9,12 @@ import {
   leaveRoom,
   markReady,
   playMove,
+  setBestOf,
   resign as resignCmd,
   settleRoom,
   startRoom,
 } from '@/src/tournament/room'
-import { RoomError, type Room } from '@/src/tournament/types'
+import { RoomError, type BestOf, type Room } from '@/src/tournament/types'
 import {
   toMatchView,
   toRoomSummary,
@@ -22,7 +23,8 @@ import {
   type RoomSummary,
   type RoomView,
 } from '@/src/tournament/views'
-import { caroMatchChannel, caroRoomChannel } from '@/src/realtime/channels'
+import { caroMatchChannel, caroRoomChannel, type MoveSignal } from '@/src/realtime/channels'
+import { gameNumber, isBotId } from '@/src/tournament/match'
 import type { PresenceStore, RoomStore } from './stores'
 import type { TelegramUser } from './telegram-auth'
 
@@ -36,6 +38,8 @@ export interface RoomServiceDeps {
   activeElsewhere?: (userId: string) => Promise<string | null>
   /** Called after each successful write with the realtime channels whose content changed. */
   notify?: (channels: string[], version: number) => void
+  /** Called with a validated human move just before it is written (see MoveSignal). */
+  notifyMove?: (channel: string, signal: MoveSignal) => void
 }
 
 const MAX_ATTEMPTS = 5
@@ -63,10 +67,11 @@ interface Mutated {
 function bracketShape(room: Room): string {
   return JSON.stringify([
     room.status,
+    room.bestOf,
     room.name,
     room.players,
     room.placements,
-    room.matches.map((m) => [m.id, m.status, m.a, m.b, m.X, m.O, m.winner, m.readyAt]),
+    room.matches.map((m) => [m.id, m.status, m.a, m.b, m.X, m.O, m.winner, m.readyAt, m.games]),
   ])
 }
 
@@ -146,6 +151,11 @@ export class RoomService {
     return this.roomView(room, user, now)
   }
 
+  async setFormat(code: string, user: TelegramUser, bestOf: BestOf): Promise<RoomView> {
+    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => setBestOf(settled(), user.id, bestOf))
+    return this.roomView(room, user, now)
+  }
+
   async cancel(code: string, user: TelegramUser): Promise<RoomView> {
     const { room, now } = await this.mutate(code, (_l, _p, t, settled) => cancelRoom(settled(), user.id, t))
     return this.roomView(room, user, now)
@@ -176,6 +186,7 @@ export class RoomService {
       (loaded, p, t) =>
         playMove(loaded, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p, { fullBotMatchId: matchId }),
       { matchId, userId: user.id },
+      (loaded, next, now) => this.signalMove(matchId, loaded, next, now),
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
   }
@@ -233,7 +244,13 @@ export class RoomService {
    * (same CAS rules) and then the original error is rethrown. Full-strength bot moves are scoped to
    * the caller's match (match requests) or to none (room requests); see SettleOpts.
    */
-  private async mutate(code: string, command: Command, caller?: { matchId: string; userId: string }): Promise<Mutated> {
+  private async mutate(
+    code: string,
+    command: Command,
+    caller?: { matchId: string; userId: string },
+    /** Runs right before the command's result is written (again on each CAS retry). */
+    beforeWrite?: (loaded: Room, next: Room, now: number) => void,
+  ): Promise<Mutated> {
     let touched = false
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const loaded = await this.deps.rooms.get(code)
@@ -265,6 +282,7 @@ export class RoomService {
       if (JSON.stringify(next) === JSON.stringify(loaded)) {
         return { room: loaded, presence, now }
       }
+      beforeWrite?.(loaded, next, now)
       const saved = await this.write(next, loaded.version, now)
       if (saved) {
         this.notifyChanged(loaded, saved)
@@ -272,6 +290,23 @@ export class RoomService {
       }
     }
     throw new RoomError('conflict')
+  }
+
+  /** Publishes the moves `next` adds to a human-vs-human match (none: retry, bot match). */
+  private signalMove(matchId: string, loaded: Room, next: Room, now: number): void {
+    if (!this.deps.notifyMove) return
+    const prev = loaded.matches.find((x) => x.id === matchId)
+    const m = next.matches.find((x) => x.id === matchId)
+    if (!prev || !m || m.moves.length <= prev.moves.length) return
+    if (isBotId(next, m.X) || isBotId(next, m.O)) return
+    const playing = m.status === 'playing' && m.turnDeadlineAt !== null
+    this.deps.notifyMove(caroMatchChannel(next._id, matchId), {
+      matchId,
+      game: gameNumber(m),
+      from: prev.moves.length,
+      moves: m.moves.slice(prev.moves.length),
+      turnRemainingMs: playing ? Math.max(0, m.turnDeadlineAt! - now) : null,
+    })
   }
 
   private notifyChanged(before: Room, after: Room): void {
