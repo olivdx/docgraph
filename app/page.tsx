@@ -100,7 +100,7 @@ export default function GamePicker() {
         </div>
       </header>
 
-      <div className="relative overflow-hidden rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-5 shadow-xl">
+      <div className="glow-clip relative rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-5 shadow-lg">
         <div className="pointer-events-none absolute -right-2 -bottom-2 grid size-32 -rotate-6 place-items-center text-[64px] drop-shadow-lg">
           ❄️
         </div>
@@ -114,7 +114,9 @@ export default function GamePicker() {
           onClick={() => router.push(active ? activePath(active) : '/caro')}
           className="mt-3.5 inline-flex items-center gap-2.5 rounded-xl border border-[#8b95ff]/45 bg-[#6c79ff]/25 py-2 pr-3.5 pl-2 font-display text-xs font-bold tracking-wider text-white uppercase"
         >
-          <span className="arcade-glow grid size-6.5 place-items-center rounded-lg bg-accent text-white">▶</span>
+          <span className="grid size-7 place-items-center rounded-lg bg-accent text-white shadow-[0_2px_6px_rgba(108,121,255,0.35)]">
+            ▶
+          </span>
           <span>{active ? `RESUME ${active.code}` : 'EXPLORE TOURNAMENTS'}</span>
         </button>
       </div>
@@ -136,7 +138,7 @@ export default function GamePicker() {
             {['X', 'O', 'X', '', 'X', 'O', 'O', '', 'X'].map((c, i) => (
               <span
                 key={i}
-                className={`grid size-6 place-items-center rounded-md bg-white/7 font-display text-sm ${
+                className={`grid size-6 place-items-center rounded-md bg-white/10 font-display text-sm ${
                   c === 'X' ? 'text-[#60a5fa]' : 'text-[#fb7185]'
                 }`}
               >
@@ -159,7 +161,7 @@ export default function GamePicker() {
             {['5', '', '3', '', '7', '', '9', '', '1'].map((c, i) => (
               <span
                 key={i}
-                className="grid size-6 place-items-center rounded-md bg-white/7 font-display text-sm text-fde047 text-yellow-300"
+                className="grid size-6 place-items-center rounded-md bg-white/10 font-display text-sm text-yellow-300"
               >
                 {c}
               </span>
@@ -197,9 +199,9 @@ function GameCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
-      className="flex cursor-pointer items-stretch gap-3.5 rounded-[20px] border border-line bg-panel p-3 text-left transition hover:border-accent/50 active:scale-[0.99]"
+      className="glow-clip flex cursor-pointer items-stretch gap-3.5 rounded-[20px] border border-line bg-panel p-3 text-left transition hover:border-accent/50 active:scale-[0.99]"
     >
-      <div className={`grid w-[108px] flex-none place-items-center rounded-[15px] shadow-inner ${thumbClass}`}>
+      <div className={`grid w-[108px] flex-none place-items-center overflow-hidden rounded-[15px] ${thumbClass}`}>
         {art}
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-between">
@@ -211,7 +213,7 @@ function GameCard({
           <p className="mt-1.5 mb-2.5 font-sans text-[11px] leading-[1.4] text-muted">{blurb}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="arcade-glow rounded-[11px] bg-accent px-3.5 py-2 font-display text-xs font-bold tracking-wider text-white uppercase">
+          <span className="rounded-[11px] bg-accent px-3.5 py-2 font-display text-xs font-bold tracking-wider text-white uppercase ring-1 ring-[#8b95ff]/35">
             PLAY NOW
           </span>
           <div className="rounded-[10px] border border-line bg-bg px-2.5 py-1 font-sans text-[10px] text-muted">

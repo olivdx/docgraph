@@ -37,13 +37,16 @@
   --font-sans: var(--font-sans), system-ui, sans-serif;
 }
 
+html {
+  overflow-x: hidden;
+  background: var(--bg);
+}
+
 body {
-  background:
-    radial-gradient(circle at 18% 6%, rgba(108, 121, 255, 0.16), transparent 38%),
-    radial-gradient(circle at 86% 12%, rgba(168, 85, 247, 0.12), transparent 34%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
 }
 
 button {
@@ -55,8 +58,15 @@ button {
   font-family: var(--font-display), system-ui, sans-serif;
 }
 
+/* Tight glow — avoids long light streaks bleeding outside cards on mobile */
 .arcade-glow {
-  box-shadow: 0 4px 14px var(--accent-glow);
+  box-shadow: 0 2px 8px rgba(108, 121, 255, 0.28);
+}
+
+/* Glow stays inside a rounded container (hero banners, cards) */
+.glow-clip {
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .lime-pill {
