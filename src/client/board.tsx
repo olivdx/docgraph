@@ -160,24 +160,7 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
   }
 
   const span = (BOARD_MAX - BOARD_MIN + 1) * cs
-  const cellBox = (c: Cell) => ({
-    left: c.x * cs,
-    top: c.y * cs,
-    width: cs,
-    height: cs,
-  })
-
-  const highlightBox = (c: Cell, bg: string) => (
-    <div
-      className="absolute box-border"
-      style={{
-        ...cellBox(c),
-        background: bg,
-        borderRadius: CELL_RADIUS,
-        border: '1px solid rgba(255,255,255,0.04)',
-      }}
-    />
-  )
+  const cellBox = (c: Cell) => ({ left: c.x * cs + 1, top: c.y * cs + 1, width: cs - 1, height: cs - 1 })
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-line bg-[var(--caro-board)] p-3">
@@ -196,8 +179,8 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
             style={{
               left: BOARD_MIN * cs,
               top: BOARD_MIN * cs,
-              width: span,
-              height: span,
+              width: span + 1,
+              height: span + 1,
               backgroundColor: 'var(--caro-board)',
               backgroundImage:
                 'linear-gradient(var(--caro-grid) 1px, transparent 1px), linear-gradient(90deg, var(--caro-grid) 1px, transparent 1px)',
@@ -206,22 +189,23 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
           />
           {[...winSet].map((k) => {
             const [x, y] = k.split(',').map(Number)
-            return <div key={`w${k}`}>{highlightBox({ x, y }, WIN_BG)}</div>
+            return (
+              <div
+                key={`w${k}`}
+                className="absolute"
+                style={{ ...cellBox({ x, y }), background: WIN_BG, borderRadius: CELL_RADIUS }}
+              />
+            )
           })}
           {last && !winSet.has(key(last)) && (
-            <div key="last-move">{highlightBox(last, LAST_MOVE_BG)}</div>
+            <div
+              className="absolute"
+              style={{ ...cellBox(last), background: LAST_MOVE_BG, borderRadius: CELL_RADIUS }}
+            />
           )}
           {moves.map((m) => (
-            <div
-              key={key(m)}
-              className="pointer-events-none absolute relative grid place-items-center"
-              style={cellBox(m)}
-            >
-              <div
-                className="absolute rounded-[9px] border border-white/5 bg-panel"
-                style={{ width: cs - 6, height: cs - 6 }}
-              />
-              <Mark side={m.side} size={Math.round(cs * 0.72)} />
+            <div key={key(m)} className="pointer-events-none absolute grid place-items-center" style={cellBox(m)}>
+              <Mark side={m.side} size={cs - 1} />
             </div>
           ))}
         </div>
