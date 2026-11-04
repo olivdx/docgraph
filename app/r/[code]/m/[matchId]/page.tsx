@@ -321,12 +321,12 @@ export default function MatchPage() {
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-stretch gap-2">
         {sides.map((s) => {
           const p = view.players[s]
           const isYou = view.you === s
           const active = view.status === 'playing' && view.turn === s
-          const label = isYou ? 'You' : p ? `${p.isBot ? '🤖 ' : ''}${p.name}` : 'TBD'
+          const displayName = isYou ? 'You' : p?.name ?? 'TBD'
           const status = active
             ? isYou
               ? 'Your turn'
@@ -337,33 +337,41 @@ export default function MatchPage() {
                   : 'To move'
             : 'Waiting'
           const time = active ? (turnLeft === null ? '…' : clock(turnLeft)) : clock(TURN_MS)
+          const timerLow = active && turnLeft !== null && turnLeft <= 5_000
           return (
             <div
               key={s}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-[16px] border bg-panel px-3 py-2.5 ${
+              className={`flex min-h-[4.25rem] min-w-0 flex-1 items-center gap-2 rounded-[16px] border bg-panel px-3 py-2.5 ${
                 active ? 'border-accent' : 'border-line'
               }`}
             >
               <Mark side={s} size={20} />
-              <div className="min-w-0 text-xs leading-[1.3]">
-                <b className="block truncate font-display text-white">{label}</b>
-                <span className="text-[11px] text-muted">{status}</span>
+              <div className="min-w-0 flex-1 self-center">
+                <div className="flex min-w-0 items-center gap-1">
+                  {!isYou && p?.isBot ? (
+                    <span className="shrink-0 text-sm leading-none" aria-hidden>
+                      🤖
+                    </span>
+                  ) : null}
+                  <b className="truncate font-display text-xs text-white">{displayName}</b>
+                </div>
+                <span className="mt-0.5 block text-[11px] leading-tight text-muted">{status}</span>
               </div>
-              {bo3 && (
+              {bo3 ? (
                 <span
                   aria-label={`${view.score[s]} games won`}
-                  className="flex-none rounded-md bg-panel2 px-1.5 py-0.5 font-display text-xs tabular-nums text-white"
+                  className="flex-none self-center rounded-md bg-panel2 px-1.5 py-0.5 font-display text-xs tabular-nums text-white"
                 >
                   {view.score[s]}
                 </span>
-              )}
+              ) : null}
               <span
-                className={`ml-auto rounded-lg px-2 py-0.5 font-display text-sm tabular-nums ${
+                className={`ml-auto flex-none self-center rounded-lg px-2 py-1 font-display text-sm tabular-nums min-w-[3.25rem] text-center ${
                   active
-                    ? turnLeft !== null && turnLeft <= 5_000
+                    ? timerLow
                       ? 'bg-rose-500/15 text-o'
                       : 'bg-[var(--lime-bg)] text-lime'
-                    : 'text-muted'
+                    : 'bg-panel2 text-muted'
                 }`}
               >
                 {time}

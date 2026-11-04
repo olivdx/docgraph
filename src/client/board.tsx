@@ -15,8 +15,9 @@ import {
 } from './board-geometry'
 import { Mark } from './marks'
 
-const LAST_MOVE_BG = 'rgba(59,130,246,.10)'
-const WIN_BG = 'rgba(34,197,94,.18)'
+const LAST_MOVE_BG = 'rgba(108, 121, 255, 0.14)'
+const WIN_BG = 'rgba(34, 197, 94, 0.22)'
+const CELL_RADIUS = 9
 const GLIDE = 'transform 320ms ease'
 
 interface Props {
@@ -159,17 +160,34 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
   }
 
   const span = (BOARD_MAX - BOARD_MIN + 1) * cs
-  const cellBox = (c: Cell) => ({ left: c.x * cs + 1, top: c.y * cs + 1, width: cs - 1, height: cs - 1 })
+  const cellBox = (c: Cell) => ({
+    left: c.x * cs,
+    top: c.y * cs,
+    width: cs,
+    height: cs,
+  })
+
+  const highlightBox = (c: Cell, bg: string) => (
+    <div
+      className="absolute box-border"
+      style={{
+        ...cellBox(c),
+        background: bg,
+        borderRadius: CELL_RADIUS,
+        border: '1px solid rgba(255,255,255,0.04)',
+      }}
+    />
+  )
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-bg">
+    <div className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-line bg-[var(--caro-board)] p-3">
       <div
         ref={viewport}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
-        className={`absolute inset-0 overflow-hidden select-none ${canPlay ? 'cursor-pointer' : 'cursor-grab'}`}
+        className={`absolute inset-3 overflow-hidden rounded-[14px] select-none ${canPlay ? 'cursor-pointer' : 'cursor-grab'}`}
         style={{ touchAction: 'none' }}
       >
         <div ref={plane} className="absolute top-0 left-0" style={{ willChange: 'transform' }}>
@@ -178,24 +196,32 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
             style={{
               left: BOARD_MIN * cs,
               top: BOARD_MIN * cs,
-              width: span + 1,
-              height: span + 1,
-              backgroundColor: 'var(--paper)',
+              width: span,
+              height: span,
+              backgroundColor: 'var(--caro-board)',
               backgroundImage:
-                'linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px)',
+                'linear-gradient(var(--caro-grid) 1px, transparent 1px), linear-gradient(90deg, var(--caro-grid) 1px, transparent 1px)',
               backgroundSize: `${cs}px ${cs}px`,
             }}
           />
           {[...winSet].map((k) => {
             const [x, y] = k.split(',').map(Number)
-            return <div key={`w${k}`} className="absolute" style={{ ...cellBox({ x, y }), background: WIN_BG }} />
+            return <div key={`w${k}`}>{highlightBox({ x, y }, WIN_BG)}</div>
           })}
           {last && !winSet.has(key(last)) && (
-            <div className="absolute" style={{ ...cellBox(last), background: LAST_MOVE_BG }} />
+            <div key="last-move">{highlightBox(last, LAST_MOVE_BG)}</div>
           )}
           {moves.map((m) => (
-            <div key={key(m)} className="pointer-events-none absolute grid place-items-center" style={cellBox(m)}>
-              <Mark side={m.side} size={cs - 1} />
+            <div
+              key={key(m)}
+              className="pointer-events-none absolute relative grid place-items-center"
+              style={cellBox(m)}
+            >
+              <div
+                className="absolute rounded-[9px] border border-white/5 bg-panel"
+                style={{ width: cs - 6, height: cs - 6 }}
+              />
+              <Mark side={m.side} size={Math.round(cs * 0.72)} />
             </div>
           ))}
         </div>
@@ -205,7 +231,7 @@ export function Board({ moves, winLine, you, turn, disabled = false, onPlay }: P
         title="Recenter"
         aria-label="Recenter"
         onClick={onRecenter}
-        className="absolute right-2.5 bottom-2.5 grid size-8 place-items-center rounded-[9px] bg-white font-bold text-slate-700 shadow-[0_1px_4px_rgba(0,0,0,.15)]"
+        className="absolute right-5 bottom-5 grid size-8 place-items-center rounded-[9px] border border-line bg-panel2 text-sm text-white"
       >
         ⌖
       </button>
