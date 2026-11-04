@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { BackButton } from '@/src/client/back-button'
 import { formatClock, LABEL, SudokuGrid, useTick } from '@/src/client/sudoku-board'
 import { PlayArea } from '@/src/client/sudoku-play'
 import { loadSolo, newSolo, saveSolo, settleSolo, soloEnter, soloOver, SOLO_NOTES_KEY, type SoloGame } from '@/src/client/solo'
@@ -60,13 +61,7 @@ function Solo() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 p-4">
       <div className="flex items-center gap-2.5 text-sm">
-        <button
-          onClick={() => router.push('/sudoku')}
-          aria-label="Back"
-          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
-        >
-          ←
-        </button>
+        <BackButton onClick={() => router.push('/sudoku')} label="Back" />
         <span className="font-display text-base text-white">Solo Sudoku</span>
         <span className="lime-pill ml-auto">{LABEL[game.difficulty]}</span>
       </div>

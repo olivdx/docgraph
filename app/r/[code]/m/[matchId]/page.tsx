@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { BackButton, ChevronLeftIcon } from '@/src/client/back-button'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { Board } from '@/src/client/board'
 import { Mark } from '@/src/client/marks'
@@ -326,8 +327,8 @@ export default function MatchPage() {
           onClick={toBracket}
           className="flex min-w-0 items-center gap-2 text-left font-display text-sm text-white"
         >
-          <span className="grid size-8 flex-none place-items-center rounded-xl border border-line bg-panel text-sm">
-            ←
+          <span className="grid size-8 flex-none place-items-center rounded-xl border border-line bg-panel text-white">
+            <ChevronLeftIcon size={18} />
           </span>
           <span className="truncate">
             {view.roundName} · #{view.id}

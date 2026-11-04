@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { BackButton } from '@/src/client/back-button'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { DifficultyPicker, formatClock, LABEL, SudokuGrid, useTick } from '@/src/client/sudoku-board'
@@ -171,13 +172,7 @@ function Room() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 p-4">
       <div className="flex items-center gap-2.5 text-sm">
-        <button
-          onClick={() => router.push('/sudoku')}
-          aria-label="Back to Sudoku"
-          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
-        >
-          ←
-        </button>
+        <BackButton onClick={() => router.push('/sudoku')} label="Back to Sudoku" />
         <span className="truncate font-display text-base text-white">{view.name}</span>
         <span className="lime-pill ml-auto">{LABEL[view.difficulty]}</span>
       </div>

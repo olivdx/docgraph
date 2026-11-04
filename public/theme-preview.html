@@ -49,14 +49,182 @@
 
     body {
       min-height: 100vh;
-      background:
-        radial-gradient(circle at 20% 10%, rgba(108, 121, 255, 0.22), transparent 40%),
-        radial-gradient(circle at 80% 15%, rgba(236, 72, 153, 0.14), transparent 35%),
-        radial-gradient(circle at 50% 90%, rgba(59, 130, 246, 0.18), transparent 45%),
-        var(--bg-stage);
+      background: var(--bg-stage);
       color: var(--text);
       font-family: var(--sans);
       padding: 28px 20px 60px;
+    }
+
+    .glow-clip {
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .phone--demo-scroll {
+      max-height: 780px;
+    }
+    .phone-scroll-body {
+      overflow-y: auto;
+      max-height: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .sticky-room-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0 10px;
+      margin-bottom: 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(18, 21, 33, 0.95);
+      backdrop-filter: blur(12px);
+    }
+    .hdr-back {
+      width: 36px;
+      height: 36px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: #fff;
+      padding: 0;
+      cursor: pointer;
+    }
+    .hdr-back svg {
+      display: block;
+    }
+    .hdr-title {
+      flex: 1;
+      min-width: 0;
+    }
+    .hdr-title b {
+      display: block;
+      font-family: var(--display);
+      font-size: 15px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-title span {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .hdr-actions {
+      display: flex;
+      flex: none;
+      gap: 6px;
+    }
+    .hdr-start {
+      border: 0;
+      border-radius: 10px;
+      background: var(--primary-bright);
+      color: #fff;
+      padding: 8px 10px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+    .hdr-start:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .hdr-close {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel2);
+      color: var(--muted);
+      padding: 8px 10px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+
+    .room-code-block {
+      border-radius: 22px;
+      border: 1px solid rgba(139, 149, 255, 0.24);
+      background: linear-gradient(135deg, #272d52 0%, #1b2038 65%, #171b2d 100%);
+      padding: 16px;
+      text-align: center;
+    }
+    .room-code-block .label {
+      font-family: var(--display);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .room-code-block .code {
+      margin: 6px 0;
+      font-family: var(--display);
+      font-size: 32px;
+      letter-spacing: 0.22em;
+      color: #fff;
+    }
+    .share-btn {
+      margin-top: 8px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--primary-bright);
+      color: #fff;
+      padding: 10px 16px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(108, 121, 255, 0.28);
+    }
+
+    .players-panel {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px;
+    }
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .player-row:last-child {
+      border-bottom: 0;
+    }
+    .p-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-size: 13px;
+      color: #fff;
+      flex: none;
+    }
+    .host-tag {
+      border-radius: 8px;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.15);
+      padding: 3px 8px;
+      font-family: var(--display);
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      color: #fcd34d;
+      text-transform: uppercase;
     }
 
     /* Top switcher bar for preview */
@@ -329,7 +497,7 @@
       background: var(--primary-bright);
       display: grid;
       place-items: center;
-      box-shadow: 0 4px 10px var(--primary-glow);
+      box-shadow: 0 2px 6px rgba(108, 121, 255, 0.35);
     }
 
     /* Section Header */
@@ -385,6 +553,7 @@
       gap: 13px;
       align-items: stretch;
       transition: transform 0.15s ease, border-color 0.15s ease;
+      overflow: hidden;
     }
     .orig-card:hover {
       border-color: var(--line-strong);
@@ -466,7 +635,8 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       cursor: pointer;
-      box-shadow: 0 4px 12px var(--primary-glow);
+      box-shadow: none;
+      outline: 1px solid rgba(139, 149, 255, 0.35);
     }
     .stat-box {
       background: var(--bg-phone);
@@ -731,10 +901,11 @@
       <span class="preview-badge">HTML Preview</span>
     </h1>
     <div class="mode-pills">
-      <button class="active" onclick="setView('all', this)">All 3 Screens</button>
-      <button onclick="setView('home', this)">1. Home Hub</button>
-      <button onclick="setView('lobby', this)">2. Room Lobby</button>
-      <button onclick="setView('match', this)">3. Live Match</button>
+      <button class="active" onclick="setView('all', this)">All</button>
+      <button onclick="setView('home', this)">1. Home</button>
+      <button onclick="setView('caro', this)">2. Caro List</button>
+      <button onclick="setView('lobby', this)">3. Room Lobby</button>
+      <button onclick="setView('match', this)">4. Match</button>
     </div>
   </div>
 
@@ -762,7 +933,7 @@
         </div>
       </header>
 
-      <div class="hero-card">
+      <div class="hero-card glow-clip">
         <div class="hero-art">❄️</div>
         <div class="hero-title">GAME CUP TOURNAMENT INVITES YOU!</div>
         <div class="online-pill">● 24 ROOMS LIVE</div>
@@ -783,7 +954,7 @@
       </div>
 
       <!-- Caro Card -->
-      <div class="orig-card">
+      <div class="orig-card glow-clip">
         <div class="orig-thumb caro-art">
           <div class="mini-grid">
             <span class="mini-cell x">X</span>
@@ -814,7 +985,7 @@
       </div>
 
       <!-- Sudoku Card -->
-      <div class="orig-card">
+      <div class="orig-card glow-clip">
         <div class="orig-thumb sudoku-art">
           <div class="mini-grid">
             <span class="mini-cell num">5</span>
@@ -845,50 +1016,22 @@
       </div>
     </section>
 
-    <!-- ==================== SCREEN 2: CARO LOBBY & ROOMS (Left/Right reference style) ==================== -->
-    <section class="phone focused" data-screen="lobby">
-      <div class="screen-tag">Screen 2 · Caro Rooms & Lobby</div>
+    <!-- ==================== SCREEN 2: CARO TOURNAMENT LIST ==================== -->
+    <section class="phone focused" data-screen="caro">
+      <div class="screen-tag">Screen 2 · Caro List (app/caro/page.tsx)</div>
 
       <header class="app-header">
         <div class="brand">
-          <div class="brand-logo">✕</div>
+          <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <div>
-            <div class="brand-title">Caro Cup</div>
-            <div class="brand-sub">Room #MP6ZXE</div>
+            <div class="brand-title">Caro Tournaments</div>
+            <div class="brand-sub">Hi, Olivier · Bo1 &amp; Bo3</div>
           </div>
         </div>
-        <div class="user-cluster">
-          <button class="btn-pill-sm">＋ CREATE</button>
-          <div class="avatar-sq">O</div>
-        </div>
+        <button class="btn-pill-sm">＋ CREATE</button>
       </header>
 
-      <!-- Bonus-card style Format Picker -->
-      <div class="sec-head">
-        <div class="sec-title">Match Format</div>
-        <span class="online-pill">HOST CONTROLS</span>
-      </div>
-
-      <div class="duo-grid">
-        <div class="bonus-card selected" id="card-bo1" onclick="pickBo(1)">
-          <div class="bonus-title">BEST OF 1<br/>BLITZ</div>
-          <div class="bonus-icon">⚡</div>
-          <button class="bonus-btn" id="btn-bo1">ACTIVE · BO1</button>
-        </div>
-        <div class="bonus-card" id="card-bo3" onclick="pickBo(3)">
-          <div class="bonus-title">BEST OF 3<br/>SERIES</div>
-          <div class="bonus-icon">👑</div>
-          <button class="bonus-btn ghost" id="btn-bo3">SELECT BO3</button>
-        </div>
-      </div>
-
-      <!-- Category Tabs -->
-      <div class="sec-head">
-        <div class="sec-title">Open Rooms</div>
-        <button class="btn-pill-sm">SHARE LINK ↗</button>
-      </div>
-
-      <div class="filter-tabs" id="lobby-tabs">
+      <div class="filter-tabs" id="caro-tabs">
         <button class="filter-tab active" onclick="pickTab(this)">ALL</button>
         <button class="filter-tab" onclick="pickTab(this)">YOUR ROOM</button>
         <button class="filter-tab" onclick="pickTab(this)">LOBBY</button>
@@ -896,57 +1039,124 @@
       </div>
 
       <div class="list-head">
-        <span>ROOM / HOST</span>
+        <span>OPEN ROOMS</span>
         <span>PLAYERS · ACTION</span>
       </div>
 
-      <!-- Game History style rows -->
       <div class="room-list">
         <div class="room-row mine">
-          <div class="room-icon" style="background: linear-gradient(135deg,#6c79ff,#4f46e5)">MP</div>
+          <div class="room-icon" style="background: linear-gradient(135deg,#6c79ff,#4f46e5)">M7</div>
           <div class="room-info">
-            <div class="room-name">Olivier's Cup</div>
-            <div class="room-sub">You're Host · 2-slot bracket</div>
+            <div class="room-name">Olivier&apos;s Cup</div>
+            <div class="room-sub">You&apos;re Host · 2-slot bracket</div>
           </div>
-          <span class="room-Slots">1/8</span>
-          <span class="pill-badge purple">START ▶</span>
+          <span class="room-Slots">1p</span>
+          <span class="pill-badge purple">RESUME</span>
         </div>
-
         <div class="room-row">
           <div class="room-icon" style="background: linear-gradient(135deg,#ec4899,#be185d)">K9</div>
           <div class="room-info">
             <div class="room-name">Night Blitz #4</div>
             <div class="room-sub">Host: Minh · Bo3</div>
           </div>
-          <span class="room-Slots">3/4</span>
-          <span class="pill-badge green">JOIN ＋</span>
-        </div>
-
-        <div class="room-row">
-          <div class="room-icon" style="background: linear-gradient(135deg,#f59e0b,#b45309)">R7</div>
-          <div class="room-info">
-            <div class="room-name">Grand Semifinal</div>
-            <div class="room-sub">Host: Alex · Round 2</div>
-          </div>
-          <span class="room-Slots">4/4</span>
-          <span class="pill-badge amber">LIVE</span>
-        </div>
-
-        <div class="room-row">
-          <div class="room-icon" style="background: linear-gradient(135deg,#10b981,#047857)">S2</div>
-          <div class="room-info">
-            <div class="room-name">Sudoku Hard Race</div>
-            <div class="room-sub">Host: Linh · 30m limit</div>
-          </div>
-          <span class="room-Slots">2/6</span>
+          <span class="room-Slots">3p</span>
           <span class="pill-badge green">JOIN ＋</span>
         </div>
       </div>
     </section>
 
-    <!-- ==================== SCREEN 3: LIVE MATCH BOARD ==================== -->
+    <!-- ==================== SCREEN 3: IN-ROOM LOBBY (sticky START / CLOSE) ==================== -->
+    <section class="phone focused phone--demo-scroll" data-screen="lobby">
+      <div class="screen-tag">Screen 3 · Room Lobby (app/r/[code]/page.tsx) — scroll players</div>
+
+      <div class="phone-scroll-body">
+        <div class="sticky-room-header">
+          <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div class="hdr-title">
+            <b>Olivier&apos;s Cup</b>
+            <span>Room #M7AJBW</span>
+          </div>
+          <div class="hdr-actions">
+            <button type="button" class="hdr-start">▶ START</button>
+            <button type="button" class="hdr-close">CLOSE</button>
+          </div>
+        </div>
+
+        <div class="room-code-block glow-clip">
+          <div class="label">Room Code</div>
+          <div class="code">M7AJBW</div>
+          <button type="button" class="share-btn">↗ SHARE INVITE LINK</button>
+        </div>
+
+        <div class="sec-head">
+          <div class="sec-title">Match Format</div>
+          <span class="online-pill">HOST CONTROLS</span>
+        </div>
+
+        <div class="duo-grid">
+          <div class="bonus-card" id="card-bo1" onclick="pickBo(1)">
+            <div class="bonus-title">BEST OF 1<br />BLITZ</div>
+            <div class="bonus-icon">⚡</div>
+            <button type="button" class="bonus-btn ghost" id="btn-bo1">SELECT BO1</button>
+          </div>
+          <div class="bonus-card selected" id="card-bo3" onclick="pickBo(3)">
+            <div class="bonus-title">BEST OF 3<br />SERIES</div>
+            <div class="bonus-icon">👑</div>
+            <button type="button" class="bonus-btn" id="btn-bo3">ACTIVE · BO3</button>
+          </div>
+        </div>
+
+        <div class="players-panel">
+          <div class="sec-head" style="margin-bottom: 10px">
+            <div class="sec-title">Players</div>
+            <span class="online-pill">8 JOINED</span>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: linear-gradient(135deg,#84cc16,#10b981)">O</div>
+            <div class="room-name" style="flex: 1">Olivier Do</div>
+            <span class="host-tag">Host</span>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #6c79ff">M</div>
+            <div class="room-name" style="flex: 1">Minh Tran</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #ec4899">L</div>
+            <div class="room-name" style="flex: 1">Linh Pham</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #f59e0b">A</div>
+            <div class="room-name" style="flex: 1">Alex Nguyen</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #06b6d4">K</div>
+            <div class="room-name" style="flex: 1">Kim Vo</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #8b5cf6">T</div>
+            <div class="room-name" style="flex: 1">Tam Le</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #64748b">🤖</div>
+            <div class="room-name" style="flex: 1">Bot Nova</div>
+          </div>
+          <div class="player-row">
+            <div class="p-avatar" style="background: #64748b">🤖</div>
+            <div class="room-name" style="flex: 1">Bot Echo</div>
+          </div>
+          <p style="margin-top: 10px; font-size: 12px; color: var(--muted)">
+            On start: 6 players → 8-slot bracket, <b style="color: #a78bfa; font-family: var(--display)">2 bots</b> added.
+          </p>
+          <p style="margin-top: 8px; font-size: 11px; color: var(--lime); font-family: var(--display)">
+            ↑ Scroll — START &amp; CLOSE stay pinned in the header
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 4: LIVE MATCH BOARD ==================== -->
     <section class="phone focused" data-screen="match">
-      <div class="screen-tag">Screen 3 · Live Caro Match</div>
+      <div class="screen-tag">Screen 4 · Live Caro Match</div>
 
       <header class="app-header">
         <div class="brand">

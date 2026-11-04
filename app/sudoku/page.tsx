@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BackButton } from '@/src/client/back-button'
 import { ApiError, apiPost } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { loadSolo, soloOver, type SoloGame } from '@/src/client/solo'
@@ -110,13 +111,7 @@ export default function SudokuHome() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
       <header className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <button
-            onClick={() => router.push('/')}
-            aria-label="Back to Games"
-            className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
-          >
-            ←
-          </button>
+          <BackButton onClick={() => router.push('/')} label="Back to Games" />
           <div>
             <div className="font-display text-xl leading-tight text-white">Sudoku Race</div>
             <div className="text-xs text-muted">30 minutes · −30 s per mistake</div>

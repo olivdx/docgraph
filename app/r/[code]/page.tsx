@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { BackButton } from '@/src/client/back-button'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { shareInvite } from '@/src/client/telegram'
@@ -179,22 +180,49 @@ function Room() {
   }
 
   const enter = (id: string) => router.push(`/r/${code}/m/${id}`)
+  const lobbyHumans = view.status === 'lobby' ? view.players.filter((p) => !p.isBot).length : 0
+  const lobbyActions = view.status === 'lobby' && blockedBy === null
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
-      <div className="flex items-center gap-2.5 text-sm">
-        <button
-          onClick={() => router.push('/caro')}
-          aria-label="Back to rooms"
-          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
-        >
-          ←
-        </button>
+      <div className="sticky top-0 z-20 -mx-4 flex items-center gap-2.5 border-b border-line/40 bg-bg/95 px-4 py-2.5 text-sm backdrop-blur-md">
+        <BackButton onClick={() => router.push('/caro')} label="Back to rooms" />
         <div className="min-w-0 flex-1">
           <div className="truncate font-display text-base text-white">{view.name}</div>
           <div className="text-[11px] text-muted">Room #{view.code}</div>
         </div>
-        <span className="lime-pill">{view.status.toUpperCase()}</span>
+        {lobbyActions && view.isHost ? (
+          <div className="flex flex-none items-center gap-1.5">
+            <button
+              type="button"
+              disabled={busy || lobbyHumans < 2}
+              onClick={() => act('start')}
+              className="rounded-[10px] bg-accent px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
+              title={lobbyHumans < 2 ? 'Need at least 2 players' : undefined}
+            >
+              ▶ START
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => act('cancel')}
+              className="rounded-[10px] border border-line bg-panel2 px-2.5 py-2 font-display text-[11px] tracking-wider text-muted uppercase disabled:opacity-50"
+            >
+              CLOSE
+            </button>
+          </div>
+        ) : lobbyActions && !view.isHost ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => act('leave')}
+            className="flex-none rounded-[10px] border border-line bg-panel2 px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
+          >
+            LEAVE
+          </button>
+        ) : view.status !== 'lobby' ? (
+          <span className="lime-pill">{view.status.toUpperCase()}</span>
+        ) : null}
       </div>
 
       {blockedBy !== null && (
@@ -206,7 +234,7 @@ function Room() {
         </div>
       )}
 
-      {view.status === 'lobby' && <Lobby view={view} busy={busy} readOnly={blockedBy !== null} act={act} onFormat={setFormat} />}
+      {view.status === 'lobby' && <Lobby view={view} readOnly={blockedBy !== null} onFormat={setFormat} />}
       {view.status === 'running' && <Bracket view={view} onEnter={enter} />}
       {view.status === 'finished' && (
         <>
@@ -252,15 +280,11 @@ function Room() {
 
 function Lobby({
   view,
-  busy,
   readOnly,
-  act,
   onFormat,
 }: {
   view: RoomView
-  busy: boolean
   readOnly: boolean
-  act: (a: 'start' | 'cancel' | 'leave') => void
   onFormat: (bestOf: BestOf) => void
 }) {
   const humans = view.players.filter((p) => !p.isBot).length
@@ -346,23 +370,9 @@ function Lobby({
         </div>
       </div>
 
-      {readOnly ? null : view.isHost ? (
-        <>
-          <button disabled={busy || humans < 2} onClick={() => act('start')} className={PRIMARY}>
-            ▶ Start tournament
-          </button>
-          <button disabled={busy} onClick={() => act('cancel')} className={GHOST}>
-            Cancel tournament
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="text-center text-[13px] text-muted">Waiting for host to start…</div>
-          <button disabled={busy} onClick={() => act('leave')} className={GHOST}>
-            Leave
-          </button>
-        </>
-      )}
+      {readOnly ? null : !view.isHost ? (
+        <div className="text-center text-[13px] text-muted">Waiting for host to start…</div>
+      ) : null}
     </>
   )
 }
