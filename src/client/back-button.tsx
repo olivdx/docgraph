@@ -1,6 +1,7 @@
 'use client'
 
-import type { ButtonHTMLAttributes, SVGProps } from 'react'
+import type { ButtonHTMLAttributes, MouseEvent, SVGProps } from 'react'
+import { markNavBack } from './nav-direction'
 
 /** Lucide `chevron-left` — https://lucide.dev/icons/chevron-left */
 export function ChevronLeftIcon({ size = 22, ...props }: SVGProps<SVGSVGElement> & { size?: number }) {
@@ -28,7 +29,7 @@ type BackButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 /** Square back control; icon is centered with grid (not text arrow metrics). */
-export function BackButton({ label = 'Back', className, children, ...props }: BackButtonProps) {
+export function BackButton({ label = 'Back', className, children, onClick, ...props }: BackButtonProps) {
   return (
     <button
       type="button"
@@ -37,6 +38,10 @@ export function BackButton({ label = 'Back', className, children, ...props }: Ba
         className ??
         'grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel text-white'
       }
+      onClick={(e: MouseEvent<HTMLButtonElement>) => {
+        markNavBack()
+        onClick?.(e)
+      }}
       {...props}
     >
       {children ?? <ChevronLeftIcon />}

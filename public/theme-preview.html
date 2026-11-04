@@ -263,6 +263,7 @@
     }
     .mode-pills {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       background: var(--bg-phone);
       padding: 4px;
@@ -301,6 +302,144 @@
     .stage.single-view .phone:not(.focused) {
       display: none;
     }
+    .stage.demo-only {
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .stage:not(.demo-only) .phone[data-screen="demo"] {
+      display: none;
+    }
+
+    /* In-app navigation prototype (GSAP) — preview only, not in Next.js yet */
+    .demo-note {
+      width: 100%;
+      margin: 10px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .demo-note b {
+      color: var(--lime);
+    }
+    .app-flow-viewport {
+      position: relative;
+      overflow: hidden;
+      min-height: 640px;
+      flex: 1;
+      border-radius: 18px;
+    }
+    .app-route {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 2px 2px 8px;
+      will-change: transform, opacity;
+    }
+    .app-route:not(.is-current) {
+      pointer-events: none;
+    }
+    .app-route-hint {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+    }
+    .flow-match-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .flow-match-actions button {
+      flex: 1;
+      min-width: 120px;
+      border-radius: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .flow-match-actions .win-btn {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border-color: rgba(34, 197, 94, 0.35);
+    }
+    .flow-match-actions .lose-btn {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: rgba(244, 63, 94, 0.35);
+    }
+    .nav-link-btn {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      text-align: inherit;
+    }
+
+    .app-route[data-route="match"] {
+      position: absolute;
+    }
+    .app-route[data-route="match"] .match-result-layer {
+      border-radius: 18px;
+    }
+
+    .phone[data-screen="match"] {
+      position: relative;
+    }
+    .match-result-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      border-radius: 34px;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .match-result-layer.is-open {
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .match-result-layer .result-scrim {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+    }
+    .match-demo-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .match-demo-row button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-family: var(--display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: var(--panel2);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .match-demo-row button:hover {
+      color: #fff;
+      border-color: rgba(108, 121, 255, 0.4);
+    }
+
 
     .phone {
       width: 375px;
@@ -888,6 +1027,250 @@
       background: rgba(108, 121, 255, 0.12);
       border-color: rgba(108, 121, 255, 0.35);
     }
+
+    /* Sudoku (app/sudoku, sudoku-board) */
+    .sudoku-panel {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px;
+    }
+    .diff-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--bg-phone);
+    }
+    .diff-picker button {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 4px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .diff-picker button.active {
+      background: var(--primary-bright);
+      color: #fff;
+    }
+    .sudoku-stats {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 10px 14px;
+    }
+    .sudoku-clock {
+      font-family: var(--display);
+      font-size: 26px;
+      font-variant-numeric: tabular-nums;
+      color: var(--lime);
+    }
+    .sudoku-clock.low {
+      color: var(--danger);
+    }
+    .sudoku-meta {
+      text-align: right;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .sudoku-meta b {
+      font-family: var(--display);
+      color: #fff;
+    }
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      aspect-ratio: 1;
+      width: 100%;
+      max-width: 100%;
+      border-radius: 8px;
+      border: 2px solid #334155;
+      background: var(--paper);
+      overflow: hidden;
+      user-select: none;
+    }
+    .sudoku-cell {
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      font-size: clamp(14px, 4.2vw, 18px);
+      border-right: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      background: #fff;
+      padding: 0;
+      cursor: pointer;
+      font-family: var(--sans);
+    }
+    .sudoku-cell:nth-child(9n) { border-right: 0; }
+    .sudoku-cell:nth-child(n+73) { border-bottom: 0; }
+    .sudoku-cell.box-r { border-right-width: 2px; border-right-color: #334155; }
+    .sudoku-cell.box-b { border-bottom-width: 2px; border-bottom-color: #334155; }
+    .sudoku-cell.given { font-weight: 800; color: #0f172a; }
+    .sudoku-cell.user { font-weight: 600; color: #4580d4; }
+    .sudoku-cell.sel { background: #bfdbfe; }
+    .sudoku-cell.peer { background: rgba(226, 232, 240, 0.85); }
+    .sudoku-cell.reveal { color: #94a3b8; font-weight: 600; }
+    .sudoku-keypad {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 4px;
+    }
+    .sudoku-keypad button {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 0;
+      font-size: 16px;
+      font-weight: 600;
+      background: var(--panel2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .sudoku-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .sudoku-actions button {
+      border-radius: 10px;
+      padding: 10px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .btn-accent-block {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px;
+      font-family: var(--display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--primary-bright);
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn-ghost-block {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: var(--display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--panel2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* Caro match result overlay (app/r/.../matchId ResultOverlay) */
+    .phone--overlay-host {
+      min-height: 720px;
+    }
+    .overlay-stack {
+      position: relative;
+      flex: 1;
+      min-height: 640px;
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    .overlay-backdrop {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 2px;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .result-scrim {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      background: rgba(18, 21, 33, 0.78);
+      backdrop-filter: blur(3px);
+    }
+    .result-modal {
+      width: 100%;
+      max-width: 320px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 20px 18px;
+      text-align: center;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+    }
+    .result-modal .result-emoji {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .result-modal .result-title {
+      margin-top: 6px;
+      font-family: var(--display);
+      font-size: 22px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .result-modal .result-score {
+      margin-top: 4px;
+      font-family: var(--display);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      color: var(--lime);
+    }
+    .result-modal .result-sub {
+      margin: 8px 0 16px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .result-next-box {
+      margin-bottom: 10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(108, 121, 255, 0.45);
+      background: linear-gradient(90deg, rgba(108, 121, 255, 0.14), var(--panel));
+    }
+    .result-next-box .result-next-label {
+      margin-bottom: 8px;
+      font-family: var(--display);
+      font-size: 13px;
+      color: #fff;
+    }
+    .result-link {
+      margin-top: 10px;
+      border: 0;
+      background: transparent;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-decoration: underline;
+      color: var(--muted);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -898,15 +1281,159 @@
       <span class="preview-badge">HTML Preview</span>
     </h1>
     <div class="mode-pills">
-      <button class="active" onclick="setView('all', this)">All</button>
+      <button onclick="setView('demo', this)">▶ Demo app (GSAP)</button>
+      <button class="active" onclick="setView('all', this)">All screens</button>
       <button onclick="setView('home', this)">1. Home</button>
       <button onclick="setView('caro', this)">2. Caro List</button>
       <button onclick="setView('lobby', this)">3. Room Lobby</button>
       <button onclick="setView('match', this)">4. Match</button>
+      <button onclick="setView('sudoku', this)">5. Sudoku</button>
+      <button onclick="setView('sudoku-solo', this)">6. Solo</button>
+      <button onclick="setView('caro-win', this)">7. Win</button>
+      <button onclick="setView('caro-lose', this)">8. Lose</button>
     </div>
+    <p class="demo-note">
+      <b>Demo app (GSAP)</b> = cùng timing đã port sang Next.js (<code>AppShell</code>, <code>MatchResultOverlay</code>).
+    </p>
   </div>
 
   <div class="stage" id="stage">
+
+    <!-- ==================== IN-APP FLOW DEMO (GSAP) ==================== -->
+    <section class="phone" data-screen="demo" id="app-flow-phone">
+      <div class="screen-tag">Prototype · in-app navigation + match result</div>
+      <div class="app-flow-viewport" id="app-flow-viewport">
+        <div class="app-route is-current" data-route="home">
+          <div class="app-route-hint">Route: / (Home)</div>
+          <header class="app-header">
+            <div class="brand">
+              <div class="brand-logo">🏆</div>
+              <div>
+                <div class="brand-title">Game Cup</div>
+                <div class="brand-sub">Hi, Olivier</div>
+              </div>
+            </div>
+          </header>
+          <div class="orig-card glow-clip">
+            <div class="orig-body">
+              <div class="orig-title">Caro Knockout</div>
+              <p class="orig-desc">Five in a row · knockout bracket</p>
+              <div class="orig-foot">
+                <button type="button" class="btn-play" onclick="appNav('caro', 1)">Play now</button>
+              </div>
+            </div>
+          </div>
+          <div class="orig-card glow-clip">
+            <div class="orig-body">
+              <div class="orig-title">Sudoku Race</div>
+              <div class="orig-foot">
+                <button type="button" class="btn-play" onclick="appNav('sudoku', 1)">Play now</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-route" data-route="caro">
+          <div class="app-route-hint">Route: /caro</div>
+          <header class="app-header">
+            <div class="brand">
+              <button type="button" class="hdr-back" aria-label="Back" onclick="appNavBack()"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <div>
+                <div class="brand-title">Caro Tournaments</div>
+              </div>
+            </div>
+          </header>
+          <div class="room-list">
+            <button type="button" class="nav-link-btn room-row" style="width:100%" onclick="appNav('lobby', 1)">
+              <div class="room-icon" style="background:#6c79ff">M7</div>
+              <div class="room-info">
+                <div class="room-name">Olivier&apos;s Cup</div>
+                <div class="room-sub">Tap to open lobby</div>
+              </div>
+              <span class="pill-badge purple">OPEN</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="app-route" data-route="lobby">
+          <div class="app-route-hint">Route: /r/M7AJBW</div>
+          <div class="sticky-room-header" style="position:relative;border:0;padding-top:0">
+            <button type="button" class="hdr-back" aria-label="Back" onclick="appNavBack()"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div class="hdr-title"><b>Olivier&apos;s Cup</b><span>Room #M7AJBW</span></div>
+            <div class="hdr-actions">
+              <button type="button" class="hdr-start" onclick="appNav('match', 1)">START</button>
+            </div>
+          </div>
+          <div class="players-panel">
+            <div class="player-row">
+              <div class="p-avatar" style="background:#84cc16">O</div>
+              <div class="room-name" style="flex:1">Olivier Do</div>
+              <span class="host-tag">Host</span>
+            </div>
+            <div class="player-row">
+              <div class="p-avatar" style="background:#64748b">🤖</div>
+              <div class="room-name" style="flex:1">Bot Nova</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-route" data-route="match">
+          <div class="app-route-hint">Route: /r/M7AJBW/m/12</div>
+          <header class="app-header">
+            <div class="brand">
+              <button type="button" class="hdr-back" aria-label="Back" onclick="appNavBack()"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <div style="min-width:0">
+                <div class="brand-title">Semifinal · #12</div>
+                <div class="brand-sub">Best of 3</div>
+              </div>
+            </div>
+            <span class="online-pill" style="font-size:10px;padding:4px 8px">● YOUR TURN</span>
+          </header>
+          <div class="board-frame" style="padding:8px">
+            <div class="caro-grid" id="flow-demo-board"></div>
+          </div>
+          <p class="brand-sub" style="text-align:center">Kết thúc trận → popup như app thật</p>
+          <div class="flow-match-actions">
+            <button type="button" class="win-btn" onclick="showMatchResult('win')">You win</button>
+            <button type="button" class="lose-btn" onclick="showMatchResult('lose')">You lose</button>
+          </div>
+          <div class="match-result-layer" id="match-result-layer" aria-hidden="true">
+            <div class="result-scrim" onclick="if (event.target === this) hideMatchResult()">
+              <div class="result-modal" id="match-result-modal"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-route" data-route="sudoku">
+          <div class="app-route-hint">Route: /sudoku</div>
+          <header class="app-header">
+            <div class="brand">
+              <button type="button" class="hdr-back" aria-label="Back" onclick="appNavBack()"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <div>
+                <div class="brand-title">Sudoku Race</div>
+              </div>
+            </div>
+          </header>
+          <div class="sudoku-panel">
+            <button type="button" class="btn-accent-block" onclick="appNav('sudoku-solo', 1)">Start solo game ▶</button>
+          </div>
+        </div>
+
+        <div class="app-route" data-route="sudoku-solo">
+          <div class="app-route-hint">Route: /sudoku/solo</div>
+          <header class="app-header">
+            <button type="button" class="hdr-back" aria-label="Back" onclick="appNavBack()"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div class="brand-title">Solo Sudoku</div>
+            <span class="online-pill" style="margin-left:auto;font-size:10px;padding:4px 8px">Medium</span>
+          </header>
+          <div class="sudoku-stats">
+            <div class="sudoku-clock">24:18</div>
+            <div class="sudoku-meta">Mistakes <b>0</b></div>
+          </div>
+          <div class="sudoku-grid" id="flow-sudoku-grid"></div>
+        </div>
+      </div>
+    </section>
 
     <!-- ==================== SCREEN 1: HOME HUB (Center screen in reference) ==================== -->
     <section class="phone focused" data-screen="home">
@@ -1215,8 +1742,181 @@
       </div>
     </section>
 
+    <!-- ==================== SCREEN 5: SUDOKU RACE LIST ==================== -->
+    <section class="phone focused" data-screen="sudoku">
+      <div class="screen-tag">Screen 5 · Sudoku Race (app/sudoku/page.tsx)</div>
+
+      <header class="app-header">
+        <div class="brand">
+          <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div style="min-width:0">
+            <div class="brand-title">Sudoku Race</div>
+            <div class="brand-sub">30 minutes · −30 s per mistake</div>
+          </div>
+        </div>
+        <span class="online-pill" style="font-size:10px;padding:4px 8px">9×9 PUZZLE</span>
+      </header>
+
+      <div class="sudoku-panel">
+        <div class="sec-head" style="margin-bottom:10px">
+          <div class="sec-title" style="font-size:15px">Play Solo</div>
+          <span class="online-pill" style="font-size:10px;padding:3px 8px">INSTANT</span>
+        </div>
+        <div class="diff-picker" id="sudoku-diff">
+          <button type="button" onclick="pickDiff(this)">Easy</button>
+          <button type="button" class="active" onclick="pickDiff(this)">Medium</button>
+          <button type="button" onclick="pickDiff(this)">Hard</button>
+        </div>
+        <button type="button" class="btn-accent-block" style="margin-top:12px">START SOLO GAME ▶</button>
+      </div>
+
+      <div class="sec-head">
+        <div class="sec-title">Race With Friends</div>
+        <button type="button" class="btn-pill-sm">＋ CREATE ROOM</button>
+      </div>
+
+      <div class="list-head">
+        <span>YOUR RACES</span>
+        <span>ACTION</span>
+      </div>
+      <div class="room-list">
+        <div class="room-row mine">
+          <div class="room-icon" style="background:#10b981">S4</div>
+          <div class="room-info">
+            <div class="room-name">Friday Sprint</div>
+            <div class="room-sub">Medium · You&apos;re in · 4 joined</div>
+          </div>
+          <span class="pill-badge purple">RESUME</span>
+        </div>
+      </div>
+
+      <div class="list-head" style="margin-top:4px">
+        <span>OPEN RACES</span>
+        <span></span>
+      </div>
+      <div class="room-list">
+        <div class="room-row">
+          <div class="room-icon" style="background:#8b5cf6">P2</div>
+          <div class="room-info">
+            <div class="room-name">Puzzle Party</div>
+            <div class="room-sub">Easy · Host: Linh · 2 joined</div>
+          </div>
+          <span class="pill-badge green">JOIN ＋</span>
+        </div>
+        <div class="room-row">
+          <div class="room-icon" style="background:#f59e0b">H8</div>
+          <div class="room-info">
+            <div class="room-name">Hard Mode Only</div>
+            <div class="room-sub">Hard · Host: Alex · <span class="pill-badge amber" style="font-size:9px;padding:2px 6px">LIVE</span></div>
+          </div>
+          <span class="pill-badge" style="background:var(--panel2);color:var(--text)">VIEW</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 6: SUDOKU SOLO PLAY ==================== -->
+    <section class="phone focused" data-screen="sudoku-solo">
+      <div class="screen-tag">Screen 6 · Solo Sudoku (app/sudoku/solo + sudoku-play)</div>
+
+      <header class="app-header" style="padding:0 2px">
+        <div class="brand">
+          <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div class="brand-title">Solo Sudoku</div>
+        </div>
+        <span class="online-pill" style="font-size:10px;padding:4px 8px">Medium</span>
+      </header>
+
+      <div class="sudoku-stats">
+        <div class="sudoku-clock" id="solo-clock">24:18</div>
+        <div class="sudoku-meta">
+          Mistakes <b>1</b><br />
+          <b>12</b> / 51 filled
+        </div>
+      </div>
+
+      <div class="sudoku-grid" id="solo-sudoku-grid"></div>
+
+      <div class="sudoku-keypad">
+        <button type="button">1</button><button type="button">2</button><button type="button">3</button>
+        <button type="button">4</button><button type="button">5</button><button type="button">6</button>
+        <button type="button">7</button><button type="button">8</button><button type="button">9</button>
+      </div>
+      <div class="sudoku-actions">
+        <button type="button" class="btn-ghost-block" style="grid-column:span 1">Notes</button>
+        <button type="button" class="btn-ghost-block">Erase</button>
+      </div>
+      <button type="button" class="btn-ghost-block" style="margin-top:4px;color:var(--danger)">Give up</button>
+    </section>
+
+    <!-- ==================== SCREEN 7: CARO — YOU WIN ==================== -->
+    <section class="phone focused phone--overlay-host" data-screen="caro-win">
+      <div class="screen-tag">Screen 7 · Caro Result — Win (MatchView overlay)</div>
+      <div class="overlay-stack">
+        <div class="overlay-backdrop">
+          <header class="app-header">
+            <div class="brand">
+              <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <div style="min-width:0">
+                <div class="brand-title">Semifinal · #12</div>
+              </div>
+            </div>
+            <button type="button" class="btn-pill-sm" style="font-size:10px;padding:6px 10px">BRACKET</button>
+          </header>
+          <div class="board-frame" style="padding:8px">
+            <div class="caro-grid" style="pointer-events:none" id="win-board-mini"></div>
+          </div>
+        </div>
+        <div class="result-scrim">
+          <div class="result-modal">
+            <div class="result-emoji">🎉</div>
+            <div class="result-title">You win!</div>
+            <div class="result-score">2 – 1</div>
+            <div class="result-sub">Five in a row · Advancing to Final</div>
+            <div class="result-next-box">
+              <div class="result-next-label">Your next match is ready</div>
+              <button type="button" class="btn-accent-block">Enter match →</button>
+            </div>
+            <button type="button" class="btn-ghost-block">View bracket</button>
+            <button type="button" class="result-link">View board</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 8: CARO — YOU LOSE ==================== -->
+    <section class="phone focused phone--overlay-host" data-screen="caro-lose">
+      <div class="screen-tag">Screen 8 · Caro Result — Lose</div>
+      <div class="overlay-stack">
+        <div class="overlay-backdrop">
+          <header class="app-header">
+            <div class="brand">
+              <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <div style="min-width:0">
+                <div class="brand-title">Quarterfinal · #8</div>
+              </div>
+            </div>
+            <button type="button" class="btn-pill-sm" style="font-size:10px;padding:6px 10px">BRACKET</button>
+          </header>
+          <div class="board-frame" style="padding:8px">
+            <div class="caro-grid" style="pointer-events:none" id="lose-board-mini"></div>
+          </div>
+        </div>
+        <div class="result-scrim">
+          <div class="result-modal">
+            <div class="result-emoji">😔</div>
+            <div class="result-title">You lose</div>
+            <div class="result-score">1 – 2</div>
+            <div class="result-sub">Five in a row · You&apos;re out. Thanks for playing!</div>
+            <button type="button" class="btn-accent-block">View bracket</button>
+            <button type="button" class="result-link">View board</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script>
     // Interactive demo board
     const preset = {
@@ -1244,6 +1944,65 @@
       }
     }
     renderBoard();
+
+    // Sudoku solo demo grid (givens + a few user digits)
+    const SUDOKU_PUZZLE =
+      '530070000600195000098000060004060230031000005007080400000603012040500008002017';
+    const SUDOKU_USER = {
+      3: '6', 4: '7', 5: '8', 12: '1', 13: '9', 21: '8', 22: '3', 30: '6', 31: '2', 39: '4', 40: '6', 48: '3',
+    };
+    const SUDOKU_GRID = [...SUDOKU_PUZZLE].map((c, i) => (c !== '0' ? c : SUDOKU_USER[i] || '0')).join('');
+
+    function sudokuCellClasses(i) {
+      const col = i % 9;
+      const row = Math.floor(i / 9);
+      let c = 'sudoku-cell';
+      if (col % 3 === 2 && col !== 8) c += ' box-r';
+      if (row % 3 === 2 && row !== 8) c += ' box-b';
+      if (i === 22) c += ' sel';
+      else if ([13, 14, 15, 21, 23, 29, 30, 31].includes(i)) c += ' peer';
+      return c;
+    }
+
+    function renderSudokuGrid(containerId, puzzle, grid) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '';
+      for (let i = 0; i < 81; i++) {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        const given = puzzle[i] !== '0';
+        const val = grid[i];
+        cell.className = sudokuCellClasses(i) + (given ? ' given' : val !== '0' ? ' user' : '');
+        cell.textContent = val === '0' ? '' : val;
+        el.appendChild(cell);
+      }
+    }
+    renderSudokuGrid('solo-sudoku-grid', SUDOKU_PUZZLE, SUDOKU_GRID);
+
+    function renderMiniCaroBoard(containerId, presetMap, lastIdx) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '';
+      for (let i = 0; i < 49; i++) {
+        const cell = document.createElement('div');
+        const v = presetMap[i] || '';
+        cell.className = 'caro-cell ' + v + (i === lastIdx ? ' last' : '');
+        cell.textContent = v ? v.toUpperCase() : '';
+        el.appendChild(cell);
+      }
+    }
+    renderMiniCaroBoard('win-board-mini', { 10: 'x', 16: 'o', 17: 'x', 18: 'o', 24: 'x', 25: 'o', 31: 'x' }, 31);
+    renderMiniCaroBoard('lose-board-mini', { 9: 'o', 10: 'x', 11: 'o', 16: 'x', 17: 'o', 18: 'x', 23: 'o', 24: 'x', 25: 'o' }, 25);
+    renderMiniCaroBoard('flow-demo-board', { 10: 'x', 16: 'o', 17: 'x', 18: 'o', 24: 'x', 25: 'o', 31: 'x' }, 31);
+    renderSudokuGrid('flow-sudoku-grid', SUDOKU_PUZZLE, SUDOKU_GRID);
+
+    function pickDiff(btn) {
+      const root = document.getElementById('sudoku-diff');
+      if (!root) return;
+      root.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
 
     // Interactive Bo1 / Bo3 optimistic toggle
     function pickBo(n) {
@@ -1274,22 +2033,204 @@
       btn.classList.add('active');
     }
 
-    // Screen filter
+    // ——— GSAP: in-app navigation demo only (preview → Next.js later) ———
+    let appRoute = 'home';
+    const appRouteStack = ['home'];
+    let appNavBusy = false;
+    let matchResultTween = null;
+
+    function initAppFlowRoutes() {
+      if (!window.gsap) return;
+      document.querySelectorAll('#app-flow-viewport .app-route').forEach((r) => {
+        const isHome = r.dataset.route === 'home';
+        r.classList.toggle('is-current', isHome);
+        gsap.set(r, { x: isHome ? 0 : '100%', opacity: isHome ? 1 : 0 });
+      });
+      appRoute = 'home';
+      appRouteStack.length = 0;
+      appRouteStack.push('home');
+    }
+
+    function appNav(to, direction) {
+      if (!window.gsap || appNavBusy || to === appRoute) return;
+      hideMatchResult(true);
+      const viewport = document.getElementById('app-flow-viewport');
+      const fromEl = viewport.querySelector(`.app-route[data-route="${appRoute}"]`);
+      const toEl = viewport.querySelector(`.app-route[data-route="${to}"]`);
+      if (!fromEl || !toEl) return;
+
+      const forward = direction >= 0;
+      const enterFrom = forward ? '100%' : '-32%';
+      const leaveTo = forward ? '-28%' : '100%';
+
+      appNavBusy = true;
+      if (forward) appRouteStack.push(to);
+      else if (appRouteStack[appRouteStack.length - 1] === appRoute) {
+        /* stack already popped in appNavBack */
+      }
+
+      toEl.classList.add('is-current');
+      gsap.set(toEl, { x: enterFrom, opacity: forward ? 0.75 : 0.9 });
+
+      gsap
+        .timeline({
+          onComplete: () => {
+            fromEl.classList.remove('is-current');
+            gsap.set(fromEl, { clearProps: 'transform,opacity' });
+            gsap.set(toEl, { clearProps: 'transform' });
+            appRoute = to;
+            appNavBusy = false;
+          },
+        })
+        .to(fromEl, { x: leaveTo, opacity: 0, duration: 0.3, ease: 'power2.in' }, 0)
+        .to(toEl, { x: 0, opacity: 1, duration: 0.36, ease: 'power2.out' }, 0.05);
+    }
+
+    function appNavBack() {
+      if (appRouteStack.length <= 1 || appNavBusy) return;
+      const to = appRouteStack[appRouteStack.length - 2];
+      appRouteStack.pop();
+      if (to === appRoute) return;
+      hideMatchResult(true);
+      const viewport = document.getElementById('app-flow-viewport');
+      const fromEl = viewport.querySelector(`.app-route[data-route="${appRoute}"]`);
+      const toEl = viewport.querySelector(`.app-route[data-route="${to}"]`);
+      if (!fromEl || !toEl) return;
+      appNavBusy = true;
+      toEl.classList.add('is-current');
+      gsap.set(toEl, { x: '-32%', opacity: 0.9 });
+      gsap
+        .timeline({
+          onComplete: () => {
+            fromEl.classList.remove('is-current');
+            gsap.set(fromEl, { clearProps: 'transform,opacity' });
+            gsap.set(toEl, { clearProps: 'transform' });
+            appRoute = to;
+            appNavBusy = false;
+          },
+        })
+        .to(fromEl, { x: '100%', opacity: 0, duration: 0.3, ease: 'power2.in' }, 0)
+        .to(toEl, { x: 0, opacity: 1, duration: 0.36, ease: 'power2.out' }, 0.05);
+    }
+
+    function playResultPopup(scrim, modal, backdrop, kind) {
+      if (!window.gsap || !scrim || !modal) return;
+      gsap.killTweensOf([scrim, modal, backdrop, modal.querySelectorAll('*')]);
+      gsap.set(scrim, { opacity: 0 });
+      gsap.set(modal, { opacity: 0, scale: 0.88, y: 22 });
+      if (backdrop) gsap.set(backdrop, { scale: 1, filter: 'blur(0px)', opacity: 1 });
+
+      const emoji = modal.querySelector('.result-emoji');
+      const staggerEls = modal.querySelectorAll(
+        '.result-title, .result-score, .result-sub, .result-next-box, .btn-accent-block, .btn-ghost-block, .result-link',
+      );
+      const tl = gsap.timeline();
+      tl.to(scrim, { opacity: 1, duration: 0.28, ease: 'power2.out' });
+      if (backdrop) {
+        tl.to(
+          backdrop,
+          { scale: 0.97, filter: 'blur(3px)', opacity: 0.55, duration: 0.35, ease: 'power2.out' },
+          0,
+        );
+      }
+      tl.to(modal, { opacity: 1, scale: 1, y: 0, duration: 0.48, ease: 'back.out(1.35)' }, 0.06);
+      if (emoji) {
+        tl.fromTo(
+          emoji,
+          { scale: 0, rotate: kind === 'win' ? -18 : 12 },
+          { scale: 1, rotate: 0, duration: 0.55, ease: 'back.out(2.2)' },
+          0.12,
+        );
+      }
+      tl.from(staggerEls, { opacity: 0, y: 14, duration: 0.32, stagger: 0.055, ease: 'power2.out' }, 0.2);
+    }
+
+    function resultModalHtml(kind) {
+      if (kind === 'win') {
+        return `
+          <div class="result-emoji">🎉</div>
+          <div class="result-title">You win!</div>
+          <div class="result-score">2 – 1</div>
+          <div class="result-sub">Five in a row · Advancing to Final</div>
+          <div class="result-next-box">
+            <div class="result-next-label">Your next match is ready</div>
+            <button type="button" class="btn-accent-block">Enter match →</button>
+          </div>
+          <button type="button" class="btn-ghost-block">View bracket</button>
+          <button type="button" class="result-link" onclick="hideMatchResult()">View board</button>
+        `;
+      }
+      return `
+        <div class="result-emoji">😔</div>
+        <div class="result-title">You lose</div>
+        <div class="result-score">1 – 2</div>
+        <div class="result-sub">Five in a row · You're out. Thanks for playing!</div>
+        <button type="button" class="btn-accent-block">View bracket</button>
+        <button type="button" class="result-link" onclick="hideMatchResult()">View board</button>
+      `;
+    }
+
+    function showMatchResult(kind) {
+      const layer = document.getElementById('match-result-layer');
+      const modal = document.getElementById('match-result-modal');
+      if (!layer || !modal || !window.gsap) return;
+      hideMatchResult(true);
+      modal.innerHTML = resultModalHtml(kind);
+      layer.classList.add('is-open');
+      layer.setAttribute('aria-hidden', 'false');
+      const scrim = layer.querySelector('.result-scrim');
+      const matchRoute = layer.closest('.app-route');
+      const backdrop = matchRoute && matchRoute.querySelector('.board-frame');
+      gsap.set(layer, { opacity: 1 });
+      playResultPopup(scrim, modal, backdrop, kind);
+    }
+
+    function hideMatchResult(instant) {
+      const layer = document.getElementById('match-result-layer');
+      if (!layer || !window.gsap) return;
+      if (matchResultTween) matchResultTween.kill();
+      const modal = document.getElementById('match-result-modal');
+      const scrim = layer.querySelector('.result-scrim');
+      const finish = () => {
+        layer.classList.remove('is-open');
+        layer.setAttribute('aria-hidden', 'true');
+        if (modal) gsap.set(modal, { clearProps: 'all' });
+        if (scrim) gsap.set(scrim, { clearProps: 'opacity' });
+        gsap.set(layer, { opacity: 0 });
+      };
+      if (instant) {
+        finish();
+        return;
+      }
+      matchResultTween = gsap.timeline({ onComplete: finish });
+      matchResultTween
+        .to(modal, { opacity: 0, scale: 0.92, y: 16, duration: 0.2, ease: 'power2.in' })
+        .to(scrim, { opacity: 0, duration: 0.18, ease: 'power2.in' }, '-=0.06');
+    }
+
     function setView(mode, btn) {
-      document.querySelectorAll('.mode-pills button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.mode-pills button').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       const stage = document.getElementById('stage');
       const phones = document.querySelectorAll('.phone');
+      stage.classList.toggle('demo-only', mode === 'demo');
       if (mode === 'all') {
         stage.classList.remove('single-view');
-        phones.forEach(p => p.classList.add('focused'));
-      } else {
-        stage.classList.add('single-view');
-        phones.forEach(p => {
-          p.classList.toggle('focused', p.dataset.screen === mode);
+        phones.forEach((p) => {
+          p.classList.toggle('focused', p.dataset.screen !== 'demo');
         });
+      } else if (mode === 'demo') {
+        stage.classList.add('single-view');
+        phones.forEach((p) => p.classList.toggle('focused', p.dataset.screen === 'demo'));
+        initAppFlowRoutes();
+      } else {
+        stage.classList.remove('demo-only');
+        stage.classList.add('single-view');
+        phones.forEach((p) => p.classList.toggle('focused', p.dataset.screen === mode));
       }
     }
+
+    initAppFlowRoutes();
   </script>
 </body>
 </html>

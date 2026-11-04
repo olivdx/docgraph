@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { BackButton, ChevronLeftIcon } from '@/src/client/back-button'
+import { ChevronLeftIcon } from '@/src/client/back-button'
+import { MatchResultOverlay } from '@/src/client/match-result-overlay'
+import { markNavBack } from '@/src/client/nav-direction'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { Board } from '@/src/client/board'
 import { Mark } from '@/src/client/marks'
@@ -25,22 +27,6 @@ const TICK_MS = 250
 
 type EndReason = NonNullable<MatchView['endReason']>
 
-const WIN_REASON: Record<EndReason, string> = {
-  five_in_row: 'Open five',
-  turn_timeout: 'Opponent timed out',
-  disconnect_timeout: 'Opponent disconnected',
-  resign: 'Opponent resigned',
-  no_show: "Opponent didn't show up",
-  board_full: 'Board full',
-}
-const LOSE_REASON: Record<EndReason, string> = {
-  five_in_row: 'Opponent made open five',
-  turn_timeout: 'You timed out',
-  disconnect_timeout: 'You disconnected',
-  resign: 'You resigned',
-  no_show: "You didn't show up",
-  board_full: 'Board full',
-}
 const loserReason = (loser: string): Record<EndReason, string> => ({
   five_in_row: 'Open five',
   turn_timeout: `${loser} timed out`,
@@ -49,17 +35,6 @@ const loserReason = (loser: string): Record<EndReason, string> => ({
   no_show: `${loser} didn't show up`,
   board_full: 'Board full',
 })
-
-const ROUND_ORDER = ['Quarterfinal', 'Semifinal', 'Final']
-function nextRoundAfter(round: string): string {
-  const m = /^Round of (\d+)$/.exec(round)
-  if (m) {
-    const n = Number(m[1]) / 2
-    return n === 8 ? 'Quarterfinal' : n === 4 ? 'Semifinal' : n === 2 ? 'Final' : `Round of ${n}`
-  }
-  const i = ROUND_ORDER.indexOf(round)
-  return i >= 0 && i < ROUND_ORDER.length - 1 ? ROUND_ORDER[i + 1] : 'the next round'
-}
 
 const opposite = (s: Side): Side => (s === 'X' ? 'O' : 'X')
 
@@ -324,7 +299,10 @@ export default function MatchPage() {
     <main className="mx-auto flex h-dvh w-full max-w-md flex-col gap-2.5 p-4">
       <div className="flex items-center justify-between gap-2 text-sm">
         <button
-          onClick={toBracket}
+          onClick={() => {
+            markNavBack()
+            toBracket()
+          }}
           className="flex min-w-0 items-center gap-2 text-left font-display text-sm text-white"
         >
           <span className="grid size-8 flex-none place-items-center rounded-xl border border-line bg-panel text-white">
@@ -449,7 +427,7 @@ export default function MatchPage() {
       </div>
 
       {finished && !resultHidden && (
-        <Result
+        <MatchResultOverlay
           view={view}
           onBracket={toBracket}
           onNext={view.nextMatchId ? () => router.push(`/r/${code}/m/${view.nextMatchId}`) : null}
@@ -463,79 +441,5 @@ export default function MatchPage() {
         </div>
       )}
     </main>
-  )
-}
-
-function Result({
-  view,
-  onBracket,
-  onNext,
-  onClose,
-}: {
-  view: MatchView
-  onBracket: () => void
-  onNext: (() => void) | null
-  onClose: () => void
-}) {
-  const { you, winner, endReason } = view
-  const winnerName = winner ? (view.players[winner]?.name ?? '?') : null
-  const loserName = winner ? (view.players[opposite(winner)]?.name ?? '?') : '?'
-  const won = you !== null && winner === you
-  const lost = you !== null && winner !== null && winner !== you
-
-  const title = you ? (won ? 'You win!' : lost ? 'You lose' : 'Match over') : winnerName ? `${winnerName} wins` : 'Match over'
-  const reason = endReason
-    ? you
-      ? (won ? WIN_REASON : LOSE_REASON)[endReason]
-      : loserReason(loserName)[endReason]
-    : null
-
-  let next: string | null = null
-  if (you) {
-    if (view.nextStep === 'champion') next = 'Champion!'
-    else if (view.nextStep === 'eliminated') next = "You're out. Thanks for playing!"
-    else if (view.nextStep === 'next_match') next = `Advancing to ${won ? nextRoundAfter(view.roundName) : '3rd Place'}`
-    else if (view.nextStep === 'podium') next = won ? 'Third place! 🥉' : 'Runner-up! 🥈'
-  }
-
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-bg/75 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-sm rounded-[22px] border border-line bg-panel p-5 text-center shadow-2xl">
-        <div className="text-[40px]">{lost ? '😔' : view.nextStep === 'champion' ? '🏆' : '🎉'}</div>
-        <div className="font-display text-[22px] text-white uppercase">{title}</div>
-        {view.bestOf === 3 && (
-          <div className="mt-1 font-display text-[15px] tabular-nums text-lime">
-            {you
-              ? `${view.score[you]} – ${view.score[opposite(you)]}`
-              : `${view.players.X?.name ?? '?'} ${view.score.X} – ${view.score.O} ${view.players.O?.name ?? '?'}`}
-          </div>
-        )}
-        <div className="mt-1.5 mb-3.5 text-[13px] text-muted">
-          {[reason, next].filter(Boolean).join(' · ')}
-        </div>
-        {onNext && (
-          <div className="mb-2.5 rounded-2xl border border-accent bg-[linear-gradient(90deg,rgba(108,121,255,0.14),var(--panel))] p-3">
-            <div className="mb-2 font-display text-sm text-white">Your next match is ready</div>
-            <button
-              onClick={onNext}
-              className="arcade-glow block w-full rounded-xl bg-accent p-[13px] font-display text-sm tracking-wider text-white uppercase"
-            >
-              ENTER MATCH →
-            </button>
-          </div>
-        )}
-        <button
-          onClick={onBracket}
-          className={`block w-full rounded-xl p-[13px] font-display text-sm tracking-wider uppercase ${
-            onNext ? 'border border-line bg-panel2 text-text' : 'arcade-glow bg-accent text-white'
-          }`}
-        >
-          VIEW BRACKET
-        </button>
-        <button onClick={onClose} className="mt-2 font-display text-xs tracking-wider text-muted uppercase underline">
-          VIEW BOARD
-        </button>
-      </div>
-    </div>
   )
 }
