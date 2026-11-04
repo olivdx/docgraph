@@ -65,8 +65,27 @@ describe('lobby commands', () => {
     expect(code(() => startRoom(lobby(3), 'u1', T0 + 10, mulberry(1)))).toBe('not_host')
   })
 
-  it('1 human start → too_few_players', () => {
-    expect(code(() => startRoom(lobby(1), 'u0', T0 + 10, mulberry(1)))).toBe('too_few_players')
+  it('1 human start → 2-slot final vs 1 bot (human X, bot O)', () => {
+    const now = T0 + 10
+    const r = startRoom(lobby(1), 'u0', now, mulberry(1))
+    expect(r.status).toBe('running')
+    expect(r.totalRounds).toBe(1)
+    expect(r.players).toHaveLength(2)
+    expect(r.players.filter((p) => p.isBot)).toHaveLength(1)
+    expect(r.matches.filter((m) => m.kind === 'normal')).toHaveLength(1)
+    const m = r.matches[0]
+    expect(m.status).toBe('pending')
+    expect(m.round).toBe(0)
+    const isBot = (id: string | null) => r.players.find((p) => p.userId === id)!.isBot
+    expect(isBot(m.X)).toBe(false)
+    expect(isBot(m.O)).toBe(true)
+    expect(m.X).toBe('u0')
+  })
+
+  it('0 humans start → too_few_players', () => {
+    const empty = structuredClone(lobby(1))
+    empty.players = []
+    expect(code(() => startRoom(empty, 'u0', T0 + 10, mulberry(1)))).toBe('too_few_players')
   })
 
   it('5 humans start → 8 slots, 3 bots, 7 normal + 1 third_place, round 0 pending, bots are O', () => {

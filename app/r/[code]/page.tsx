@@ -126,7 +126,7 @@ function Room() {
         const c = e instanceof ApiError ? e.code : 'unknown'
         setToast(
           c === 'too_few_players'
-            ? 'Need at least 2 players to start.'
+            ? 'Need at least 1 player to start.'
             : c === 'not_lobby'
               ? 'The tournament has already started.'
               : 'Something went wrong. Try again.',
@@ -195,10 +195,10 @@ function Room() {
           <div className="flex flex-none items-center gap-1.5">
             <button
               type="button"
-              disabled={busy || lobbyHumans < 2}
+              disabled={busy || lobbyHumans < 1}
               onClick={() => act('start')}
               className="rounded-[10px] bg-accent px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
-              title={lobbyHumans < 2 ? 'Need at least 2 players' : undefined}
+              title={lobbyHumans < 1 ? 'Need at least 1 player' : lobbyHumans === 1 ? 'Start vs bot' : undefined}
             >
               START
             </button>
@@ -365,8 +365,16 @@ function Lobby({
           </div>
         ))}
         <div className="mt-2.5 text-xs text-muted">
-          On start: {humans} players → {view.slotsIfStartedNow}-slot bracket,{' '}
-          <b className="font-display text-[#a78bfa]">{view.botsIfStartedNow} bots</b> added.
+          {humans === 1 ? (
+            <>
+              Solo start: you vs <b className="font-display text-[#a78bfa]">1 bot</b> — jumps straight into the Final.
+            </>
+          ) : (
+            <>
+              On start: {humans} players → {view.slotsIfStartedNow}-slot bracket,{' '}
+              <b className="font-display text-[#a78bfa]">{view.botsIfStartedNow} bots</b> added.
+            </>
+          )}
         </div>
       </div>
 
