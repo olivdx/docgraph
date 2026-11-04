@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { apiGet } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { getStartParam, initTelegram } from '@/src/client/telegram'
-import { usePoll } from '@/src/client/use-poll'
+import { putPollCache, usePoll } from '@/src/client/use-poll'
 
 interface Me {
   user: { id: string; name: string; avatarUrl: string | null }
@@ -45,6 +45,7 @@ export default function GamePicker() {
     }
     apiGet<Me>('/api/me')
       .then((m) => {
+        putPollCache('/api/me', m)
         if (m.active) router.replace(activePath(m.active))
         else setBooting(false)
       })

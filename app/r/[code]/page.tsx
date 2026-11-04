@@ -18,6 +18,23 @@ const CARD = 'rounded-2xl border border-line bg-panel p-4'
 
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '?'
 
+function PlayerAvatar({ name, avatarUrl, i }: { name: string; avatarUrl: string | null; i: number }) {
+  if (avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={avatarUrl} alt="" className="size-[30px] flex-none rounded-full object-cover" />
+    )
+  }
+  return (
+    <div
+      className="grid size-[30px] flex-none place-items-center rounded-full text-[13px] font-bold text-white"
+      style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
+    >
+      {initial(name)}
+    </div>
+  )
+}
+
 export default function RoomPage() {
   return (
     <Suspense fallback={<main className="flex flex-1 items-center justify-center text-sm text-muted">Loading…</main>}>
@@ -40,6 +57,7 @@ function Room() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const joinTried = useRef(false)
+  const formatSeq = useRef(0)
 
   // Prefer whichever is fresher: the last poll or the last action response.
   const view = override && (!room || override.serverNow > room.serverNow) ? override : room
@@ -121,18 +139,24 @@ function Room() {
 
   const setFormat = useCallback(
     async (bestOf: BestOf) => {
-      if (busy || view?.bestOf === bestOf) return
-      setBusy(true)
+      if (view?.bestOf === bestOf) return
+      const base = view
+      if (!base) return
+      const my = ++formatSeq.current
+      const revert = base
+      setOverride({ ...base, bestOf, serverNow: Math.max(base.serverNow, Date.now()) + 1 })
       try {
-        setOverride(await apiPost<RoomView>(`/api/rooms/${code}/format`, { bestOf }))
+        const r = await apiPost<RoomView>(`/api/rooms/${code}/format`, { bestOf })
+        if (my !== formatSeq.current) return
+        setOverride(r)
       } catch {
+        if (my !== formatSeq.current) return
         setToast('Could not change the format. Try again.')
+        setOverride({ ...revert, serverNow: Math.max(revert.serverNow, Date.now()) + 1 })
         refresh()
-      } finally {
-        setBusy(false)
       }
     },
-    [busy, view?.bestOf, code, refresh],
+    [view, code, refresh],
   )
 
   if (!view) {
@@ -260,7 +284,6 @@ function Lobby({
               <button
                 key={n}
                 type="button"
-                disabled={busy}
                 aria-pressed={view.bestOf === n}
                 onClick={() => onFormat(n)}
                 className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
@@ -283,12 +306,7 @@ function Lobby({
         </div>
         {view.players.map((p, i) => (
           <div key={`${p.name}-${i}`} className="flex items-center gap-2.5 border-b border-[#2a3850] py-[9px] last:border-b-0">
-            <div
-              className="grid size-[30px] flex-none place-items-center rounded-full text-[13px] font-bold text-white"
-              style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
-            >
-              {initial(p.name)}
-            </div>
+            <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} i={i} />
             <div className="min-w-0 flex-1 truncate text-sm">{p.name}</div>
             {p.isHost && (
               <span className="rounded-full border border-[#78591a] bg-panel2 px-2 py-0.5 text-[11px] text-amber-400">

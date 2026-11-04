@@ -10,11 +10,29 @@ export interface PollOptions {
   liveIntervalMs?: number
 }
 
+/** Survives client navigations so remounted pages can paint before the next fetch. */
+const pollCache = new Map<string, unknown>()
+
+export function peekPollCache<T>(path: string): T | null {
+  return (pollCache.get(path) as T | undefined) ?? null
+}
+
+export function putPollCache<T>(path: string, data: T): void {
+  pollCache.set(path, data)
+}
+
 export function usePoll<T>(path: string | null, intervalMs: number, opts: PollOptions = {}) {
-  const [data, setData] = useState<T | null>(null)
+  const [data, setData] = useState<T | null>(() => (path ? peekPollCache<T>(path) : null))
   const [error, setError] = useState<ApiError | null>(null)
   const seq = useRef(0)
   const kickRef = useRef<() => void>(() => {})
+
+  // Path can flip from null → URL after boot; pick up anything already cached (e.g. first /api/me).
+  useEffect(() => {
+    if (!path) return
+    const cached = peekPollCache<T>(path)
+    if (cached !== null) setData(cached)
+  }, [path])
 
   const load = useCallback(async () => {
     if (!path) return
@@ -22,6 +40,7 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts: PollOp
     try {
       const d = await apiGet<T>(path)
       if (my !== seq.current) return
+      putPollCache(path, d)
       setData(d)
       setError(null)
     } catch (e) {
