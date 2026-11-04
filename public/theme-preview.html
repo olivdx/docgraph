@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Cup — Arcade Theme Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-stage: #131129;
+      --bg-phone: #121521;
+      --panel: #191d2e;
+      --panel-2: #21263c;
+      --panel-hover: #282e48;
+      --line: rgba(255, 255, 255, 0.07);
+      --line-strong: rgba(114, 124, 245, 0.35);
+      --text: #f8fafc;
+      --muted: #8b95b0;
+      --primary: #5e6ad2;
+      --primary-bright: #6c79ff;
+      --primary-glow: rgba(108, 121, 255, 0.38);
+      --lime: #a3e635;
+      --lime-bg: rgba(163, 230, 53, 0.14);
+      --emerald: #22c55e;
+      --emerald-bg: rgba(34, 197, 94, 0.15);
+      --danger: #f43f5e;
+      --danger-bg: rgba(244, 63, 94, 0.15);
+      --gold: #fbbf24;
+      --display: 'Fredoka', system-ui, sans-serif;
+      --sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    *::-webkit-scrollbar {
+      display: none;
+    }
+
+    button {
+      font-family: var(--display);
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(108, 121, 255, 0.22), transparent 40%),
+        radial-gradient(circle at 80% 15%, rgba(236, 72, 153, 0.14), transparent 35%),
+        radial-gradient(circle at 50% 90%, rgba(59, 130, 246, 0.18), transparent 45%),
+        var(--bg-stage);
+      color: var(--text);
+      font-family: var(--sans);
+      padding: 28px 20px 60px;
+    }
+
+    /* Top switcher bar for preview */
+    .preview-bar {
+      max-width: 1220px;
+      margin: 0 auto 28px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: rgba(25, 29, 46, 0.85);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+      padding: 12px 18px;
+      border-radius: 18px;
+    }
+    .preview-bar h1 {
+      font-family: var(--display);
+      font-size: 18px;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .preview-badge {
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--lime-bg);
+      color: var(--lime);
+    }
+    .mode-pills {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-phone);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+    .mode-pills button {
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+      padding: 7px 13px;
+      border-radius: 9px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mode-pills button.active {
+      background: var(--primary-bright);
+      color: #fff;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    /* 3-Phone Showcase Grid */
+    .stage {
+      max-width: 1220px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 26px;
+      align-items: start;
+      justify-items: center;
+    }
+    .stage.single-view .phone:not(.focused) {
+      display: none;
+    }
+
+    .phone {
+      width: 375px;
+      max-width: 100%;
+      background: var(--bg-phone);
+      border-radius: 34px;
+      border: 2px solid rgba(255, 255, 255, 0.09);
+      box-shadow:
+        0 28px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 6px rgba(18, 21, 33, 0.85);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen-tag {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 2px;
+    }
+
+    /* App Header (matches reference top bar) */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 2px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6c79ff 0%, #a855f7 100%);
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(108, 121, 255, 0.35);
+      flex: none;
+    }
+    .brand-title {
+      font-family: var(--display);
+      font-size: 15px;
+      line-height: 1.15;
+      color: #fff;
+    }
+    .brand-sub {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .user-cluster {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-chip {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 7px 11px;
+      border-radius: 11px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      background: var(--lime);
+      box-shadow: 0 0 8px var(--lime);
+    }
+    .wallet-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 11px;
+      background: var(--primary-bright);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 15px;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      border: 0;
+      cursor: pointer;
+    }
+    .avatar-sq {
+      width: 36px;
+      height: 36px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #84cc16, #10b981);
+      border: 2px solid #a3e635;
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 15px;
+      color: #0f172a;
+      position: relative;
+    }
+
+    /* Hero Banner */
+    .hero-card {
+      position: relative;
+      border-radius: 22px;
+      padding: 20px 18px;
+      background:
+        radial-gradient(circle at 88% 30%, rgba(168, 85, 247, 0.45), transparent 55%),
+        linear-gradient(135deg, #272d52 0%, #1b2038 65%, #171b2d 100%);
+      border: 1px solid rgba(139, 149, 255, 0.24);
+      overflow: hidden;
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+    }
+    .hero-art {
+      position: absolute;
+      right: -8px;
+      bottom: -10px;
+      width: 132px;
+      height: 132px;
+      border-radius: 28px;
+      background: radial-gradient(circle, rgba(108, 121, 255, 0.35), transparent 70%);
+      display: grid;
+      place-items: center;
+      font-size: 68px;
+      transform: rotate(-8deg);
+      pointer-events: none;
+      filter: drop-shadow(0 10px 16px rgba(0,0,0,0.45));
+    }
+    .hero-title {
+      font-family: var(--display);
+      font-size: 23px;
+      line-height: 1.08;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      max-width: 215px;
+      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+    }
+    .online-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--lime-bg);
+      color: var(--lime);
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .hero-cta {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: rgba(108, 121, 255, 0.25);
+      border: 1px solid rgba(139, 149, 255, 0.45);
+      color: #fff;
+      padding: 8px 14px 8px 9px;
+      border-radius: 12px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .hero-cta .play-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--primary-bright);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 10px var(--primary-glow);
+    }
+
+    /* Section Header */
+    .sec-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .sec-title {
+      font-family: var(--display);
+      font-size: 18px;
+      letter-spacing: 0.01em;
+    }
+    .sec-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .icon-sq {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+    }
+    .btn-pill-sm {
+      background: var(--primary-bright);
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 7px 12px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    /* Originals-style Horizontal Game Cards */
+    .orig-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 12px;
+      display: flex;
+      gap: 13px;
+      align-items: stretch;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .orig-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+    }
+    .orig-thumb {
+      width: 112px;
+      border-radius: 15px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+    }
+    .orig-thumb.caro-art {
+      background: radial-gradient(circle at 30% 25%, #4f46e5, #1e1b4b 85%);
+    }
+    .orig-thumb.sudoku-art {
+      background: radial-gradient(circle at 30% 25%, #0ea5e9, #172554 85%);
+    }
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 24px);
+      gap: 4px;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+    }
+    .mini-cell {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.07);
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-size: 14px;
+    }
+    .mini-cell.x { color: #60a5fa; }
+    .mini-cell.o { color: #fb7185; }
+    .mini-cell.num { color: #fde047; }
+
+    .orig-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .orig-title {
+      font-family: var(--display);
+      font-size: 17px;
+      color: #fff;
+    }
+    .orig-desc {
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--muted);
+      margin: 5px 0 9px;
+    }
+    .orig-foot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-play {
+      background: var(--primary-bright);
+      color: #fff;
+      border: 0;
+      border-radius: 11px;
+      padding: 9px 15px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+    .stat-box {
+      background: var(--bg-phone);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 4px 10px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .stat-box b {
+      display: block;
+      color: #fff;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Filter Tabs (ALL / NEW / TOP / HOT style) */
+    .filter-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .filter-tab {
+      padding: 7px 13px;
+      border-radius: 10px;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .filter-tab.active {
+      background: var(--primary-bright);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    /* Game History / Open Rooms Table Rows */
+    .list-head {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .room-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .room-row {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .room-row.mine {
+      border-color: var(--primary-bright);
+      background: linear-gradient(90deg, rgba(108, 121, 255, 0.14), var(--panel));
+    }
+    .room-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-size: 14px;
+      color: #fff;
+      flex: none;
+    }
+    .room-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .room-name {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .room-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .room-Slots {
+      font-family: var(--display);
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      margin-right: 4px;
+    }
+    .pill-badge {
+      padding: 6px 11px;
+      border-radius: 9px;
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .pill-badge.green {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+    }
+    .pill-badge.purple {
+      background: var(--primary-bright);
+      color: #fff;
+      box-shadow: 0 3px 10px var(--primary-glow);
+    }
+    .pill-badge.amber {
+      background: var(--danger-bg);
+      color: var(--danger);
+    }
+
+    /* Bonus / Quick Format Cards (Left Screen style) */
+    .duo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .bonus-card {
+      background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .bonus-card.selected {
+      border-color: var(--primary-bright);
+      box-shadow: inset 0 0 24px rgba(108, 121, 255, 0.16);
+    }
+    .bonus-title {
+      font-family: var(--display);
+      font-size: 14px;
+      text-transform: uppercase;
+      line-height: 1.15;
+    }
+    .bonus-icon {
+      font-size: 34px;
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+    }
+    .bonus-btn {
+      width: 100%;
+      padding: 9px 0;
+      border-radius: 11px;
+      border: 0;
+      font-family: var(--display);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--primary-bright);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      transition: all 0.15s ease;
+    }
+    .bonus-btn.ghost {
+      background: var(--bg-phone);
+      color: var(--muted);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    /* Screen 3: Match Board in Arcade Theme */
+    .versus-bar {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .p-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .p-name {
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .p-clock {
+      font-family: var(--display);
+      font-size: 13px;
+      padding: 3px 8px;
+      border-radius: 7px;
+      background: var(--lime-bg);
+      color: var(--lime);
+    }
+    .board-frame {
+      background: #161929;
+      border: 2px solid rgba(108, 121, 255, 0.28);
+      border-radius: 22px;
+      padding: 12px;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+    .caro-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+    .caro-cell {
+      aspect-ratio: 1;
+      border-radius: 9px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-size: 20px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .caro-cell:hover {
+      background: var(--panel-hover);
+    }
+    .caro-cell.x {
+      color: #60a5fa;
+      text-shadow: 0 0 10px rgba(96, 165, 250, 0.55);
+    }
+    .caro-cell.o {
+      color: #fb7185;
+      text-shadow: 0 0 10px rgba(251, 113, 133, 0.55);
+    }
+    .caro-cell.last {
+      background: rgba(108, 121, 255, 0.22);
+      border-color: var(--primary-bright);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="preview-bar">
+    <h1>
+      <span>🎮 Game Cup — Yeti Arcade UI Theme</span>
+      <span class="preview-badge">HTML Preview</span>
+    </h1>
+    <div class="mode-pills">
+      <button class="active" onclick="setView('all', this)">All 3 Screens</button>
+      <button onclick="setView('home', this)">1. Home Hub</button>
+      <button onclick="setView('lobby', this)">2. Room Lobby</button>
+      <button onclick="setView('match', this)">3. Live Match</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+
+    <!-- ==================== SCREEN 1: HOME HUB (Center screen in reference) ==================== -->
+    <section class="phone focused" data-screen="home">
+      <div class="screen-tag">Screen 1 · Home Hub (app/page.tsx)</div>
+
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-logo">🏆</div>
+          <div>
+            <div class="brand-title">Game Cup</div>
+            <div class="brand-sub">Hi, Olivier</div>
+          </div>
+        </div>
+        <div class="user-cluster">
+          <div class="status-chip">
+            <span class="status-dot"></span>
+            <span>MP6ZXE</span>
+          </div>
+          <button class="wallet-btn" title="Active Room">⚡</button>
+          <div class="avatar-sq">O</div>
+        </div>
+      </header>
+
+      <div class="hero-card">
+        <div class="hero-art">❄️</div>
+        <div class="hero-title">GAME CUP TOURNAMENT INVITES YOU!</div>
+        <div class="online-pill">● 24 ROOMS LIVE</div>
+        <br />
+        <button class="hero-cta">
+          <span class="play-icon">▶</span>
+          <span>RESUME ROOM MP6ZXE</span>
+        </button>
+      </div>
+
+      <div class="sec-head">
+        <div class="sec-title">Originals Games</div>
+        <div class="sec-actions">
+          <span class="icon-sq">‹</span>
+          <span class="icon-sq">›</span>
+          <button class="btn-pill-sm">VIEW ALL</button>
+        </div>
+      </div>
+
+      <!-- Caro Card -->
+      <div class="orig-card">
+        <div class="orig-thumb caro-art">
+          <div class="mini-grid">
+            <span class="mini-cell x">X</span>
+            <span class="mini-cell o">O</span>
+            <span class="mini-cell x">X</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell x">X</span>
+            <span class="mini-cell o">O</span>
+            <span class="mini-cell o">O</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell x">X</span>
+          </div>
+        </div>
+        <div class="orig-body">
+          <div>
+            <div class="orig-title">Caro Knockout</div>
+            <div class="online-pill">18 ROOMS OPEN</div>
+            <p class="orig-desc">Five in a row on a 100×100 board. Knockout bracket, bots fill empty seats.</p>
+          </div>
+          <div class="orig-foot">
+            <button class="btn-play">PLAY NOW</button>
+            <div class="stat-box">
+              Format
+              <b>Bo1 · Bo3</b>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sudoku Card -->
+      <div class="orig-card">
+        <div class="orig-thumb sudoku-art">
+          <div class="mini-grid">
+            <span class="mini-cell num">5</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell num">3</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell num">7</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell num">9</span>
+            <span class="mini-cell"></span>
+            <span class="mini-cell num">1</span>
+          </div>
+        </div>
+        <div class="orig-body">
+          <div>
+            <div class="orig-title">Sudoku Race</div>
+            <div class="online-pill">6 RACES LIVE</div>
+            <p class="orig-desc">9×9 speed race on the same puzzle or solo mode. −30s per mistake.</p>
+          </div>
+          <div class="orig-foot">
+            <button class="btn-play">PLAY NOW</button>
+            <div class="stat-box">
+              Time limit
+              <b>30:00</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 2: CARO LOBBY & ROOMS (Left/Right reference style) ==================== -->
+    <section class="phone focused" data-screen="lobby">
+      <div class="screen-tag">Screen 2 · Caro Rooms & Lobby</div>
+
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-logo">✕</div>
+          <div>
+            <div class="brand-title">Caro Cup</div>
+            <div class="brand-sub">Room #MP6ZXE</div>
+          </div>
+        </div>
+        <div class="user-cluster">
+          <button class="btn-pill-sm">＋ CREATE</button>
+          <div class="avatar-sq">O</div>
+        </div>
+      </header>
+
+      <!-- Bonus-card style Format Picker -->
+      <div class="sec-head">
+        <div class="sec-title">Match Format</div>
+        <span class="online-pill">HOST CONTROLS</span>
+      </div>
+
+      <div class="duo-grid">
+        <div class="bonus-card selected" id="card-bo1" onclick="pickBo(1)">
+          <div class="bonus-title">BEST OF 1<br/>BLITZ</div>
+          <div class="bonus-icon">⚡</div>
+          <button class="bonus-btn" id="btn-bo1">ACTIVE · BO1</button>
+        </div>
+        <div class="bonus-card" id="card-bo3" onclick="pickBo(3)">
+          <div class="bonus-title">BEST OF 3<br/>SERIES</div>
+          <div class="bonus-icon">👑</div>
+          <button class="bonus-btn ghost" id="btn-bo3">SELECT BO3</button>
+        </div>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="sec-head">
+        <div class="sec-title">Open Rooms</div>
+        <button class="btn-pill-sm">SHARE LINK ↗</button>
+      </div>
+
+      <div class="filter-tabs" id="lobby-tabs">
+        <button class="filter-tab active" onclick="pickTab(this)">ALL</button>
+        <button class="filter-tab" onclick="pickTab(this)">YOUR ROOM</button>
+        <button class="filter-tab" onclick="pickTab(this)">LOBBY</button>
+        <button class="filter-tab" onclick="pickTab(this)">LIVE</button>
+      </div>
+
+      <div class="list-head">
+        <span>ROOM / HOST</span>
+        <span>PLAYERS · ACTION</span>
+      </div>
+
+      <!-- Game History style rows -->
+      <div class="room-list">
+        <div class="room-row mine">
+          <div class="room-icon" style="background: linear-gradient(135deg,#6c79ff,#4f46e5)">MP</div>
+          <div class="room-info">
+            <div class="room-name">Olivier's Cup</div>
+            <div class="room-sub">You're Host · 2-slot bracket</div>
+          </div>
+          <span class="room-Slots">1/8</span>
+          <span class="pill-badge purple">START ▶</span>
+        </div>
+
+        <div class="room-row">
+          <div class="room-icon" style="background: linear-gradient(135deg,#ec4899,#be185d)">K9</div>
+          <div class="room-info">
+            <div class="room-name">Night Blitz #4</div>
+            <div class="room-sub">Host: Minh · Bo3</div>
+          </div>
+          <span class="room-Slots">3/4</span>
+          <span class="pill-badge green">JOIN ＋</span>
+        </div>
+
+        <div class="room-row">
+          <div class="room-icon" style="background: linear-gradient(135deg,#f59e0b,#b45309)">R7</div>
+          <div class="room-info">
+            <div class="room-name">Grand Semifinal</div>
+            <div class="room-sub">Host: Alex · Round 2</div>
+          </div>
+          <span class="room-Slots">4/4</span>
+          <span class="pill-badge amber">LIVE</span>
+        </div>
+
+        <div class="room-row">
+          <div class="room-icon" style="background: linear-gradient(135deg,#10b981,#047857)">S2</div>
+          <div class="room-info">
+            <div class="room-name">Sudoku Hard Race</div>
+            <div class="room-sub">Host: Linh · 30m limit</div>
+          </div>
+          <span class="room-Slots">2/6</span>
+          <span class="pill-badge green">JOIN ＋</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 3: LIVE MATCH BOARD ==================== -->
+    <section class="phone focused" data-screen="match">
+      <div class="screen-tag">Screen 3 · Live Caro Match</div>
+
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-logo">←</div>
+          <div>
+            <div class="brand-title">Semifinal · Game 1</div>
+            <div class="brand-sub">Best of 3 · First to 2</div>
+          </div>
+        </div>
+        <div class="user-cluster">
+          <span class="online-pill">● YOUR TURN</span>
+        </div>
+      </header>
+
+      <div class="versus-bar">
+        <div class="p-side">
+          <div class="avatar-sq">O</div>
+          <div>
+            <div class="p-name">Olivier (X)</div>
+            <div class="brand-sub">Score: 1</div>
+          </div>
+        </div>
+        <div class="p-clock" id="clock">0:28</div>
+        <div class="p-side">
+          <div style="text-align:right">
+            <div class="p-name">Bot Nova (O)</div>
+            <div class="brand-sub">Score: 0</div>
+          </div>
+          <div class="avatar-sq" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);border-color:#93c5fd">🤖</div>
+        </div>
+      </div>
+
+      <div class="board-frame">
+        <div class="caro-grid" id="demo-board"></div>
+      </div>
+
+      <div class="sec-head">
+        <div class="sec-title">Match Log</div>
+        <span class="brand-sub">Tap any empty cell to test</span>
+      </div>
+
+      <div class="room-list">
+        <div class="room-row">
+          <div class="room-icon" style="background:#1e293b;color:#60a5fa">X</div>
+          <div class="room-info">
+            <div class="room-name">Olivier placed at (0, 0)</div>
+            <div class="room-sub">Optimistic UI · 0 ms latency</div>
+          </div>
+          <span class="pill-badge green">+WIN 62%</span>
+        </div>
+        <div class="room-row">
+          <div class="room-icon" style="background:#1e293b;color:#fb7185">O</div>
+          <div class="room-info">
+            <div class="room-name">Bot Nova replied (1, 1)</div>
+            <div class="room-sub">Ably Realtime Signal</div>
+          </div>
+          <span class="pill-badge amber">DEFEND</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // Interactive demo board
+    const preset = {
+      10: 'x', 16: 'o', 17: 'x', 18: 'o', 24: 'x', 25: 'o', 31: 'x'
+    };
+    let lastIdx = 31;
+    let turn = 'o';
+    const board = document.getElementById('demo-board');
+
+    function renderBoard() {
+      board.innerHTML = '';
+      for (let i = 0; i < 49; i++) {
+        const cell = document.createElement('div');
+        const v = preset[i] || '';
+        cell.className = 'caro-cell ' + v + (i === lastIdx ? ' last' : '');
+        cell.textContent = v ? v.toUpperCase() : '';
+        cell.onclick = () => {
+          if (preset[i]) return;
+          preset[i] = turn;
+          lastIdx = i;
+          turn = turn === 'x' ? 'o' : 'x';
+          renderBoard();
+        };
+        board.appendChild(cell);
+      }
+    }
+    renderBoard();
+
+    // Interactive Bo1 / Bo3 optimistic toggle
+    function pickBo(n) {
+      const c1 = document.getElementById('card-bo1');
+      const c3 = document.getElementById('card-bo3');
+      const b1 = document.getElementById('btn-bo1');
+      const b3 = document.getElementById('btn-bo3');
+      if (n === 1) {
+        c1.classList.add('selected');
+        c3.classList.remove('selected');
+        b1.className = 'bonus-btn';
+        b1.textContent = 'ACTIVE · BO1';
+        b3.className = 'bonus-btn ghost';
+        b3.textContent = 'SELECT BO3';
+      } else {
+        c3.classList.add('selected');
+        c1.classList.remove('selected');
+        b3.className = 'bonus-btn';
+        b3.textContent = 'ACTIVE · BO3';
+        b1.className = 'bonus-btn ghost';
+        b1.textContent = 'SELECT BO1';
+      }
+    }
+
+    // Interactive filter tabs
+    function pickTab(btn) {
+      btn.parentElement.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Screen filter
+    function setView(mode, btn) {
+      document.querySelectorAll('.mode-pills button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const stage = document.getElementById('stage');
+      const phones = document.querySelectorAll('.phone');
+      if (mode === 'all') {
+        stage.classList.remove('single-view');
+        phones.forEach(p => p.classList.add('focused'));
+      } else {
+        stage.classList.add('single-view');
+        phones.forEach(p => {
+          p.classList.toggle('focused', p.dataset.screen === mode);
+        });
+      }
+    }
+  </script>
+</body>
+</html>

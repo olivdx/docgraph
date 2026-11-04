@@ -57,17 +57,19 @@ export function PlayArea({
   const low = remainingMs < 60_000
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between rounded-[16px] border border-line bg-panel px-3.5 py-2.5">
         <div className="relative">
-          <div className={`font-mono text-[28px] font-bold tabular-nums ${low ? 'text-o' : 'text-text'}`}>{formatClock(remainingMs)}</div>
+          <div className={`font-display text-2xl tabular-nums ${low ? 'text-o' : 'text-lime'}`}>
+            {formatClock(remainingMs)}
+          </div>
           {penalties.map((k) => (
-            <span key={k} className="absolute -right-12 top-1 animate-[sudoku-float_1.2s_ease-out_forwards] text-sm font-bold text-o">
+            <span key={k} className="absolute -right-12 top-1 animate-[sudoku-float_1.2s_ease-out_forwards] font-display text-sm text-o">
               −30 s
             </span>
           ))}
         </div>
-        <div className="text-right text-[13px] text-muted">
-          Mistakes <b className={mistakes ? 'text-o' : 'text-text'}>{mistakes}</b>
+        <div className="text-right text-xs text-muted">
+          Mistakes <b className={`font-display ${mistakes ? 'text-o' : 'text-white'}`}>{mistakes}</b>
           <br />
           {[...grid].filter((c, i) => c !== '0' && puzzle[i] === '0').length} / {[...puzzle].filter((c) => c === '0').length} filled
         </div>

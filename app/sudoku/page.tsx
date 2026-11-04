@@ -11,7 +11,7 @@ import { DifficultyPicker, LABEL } from '@/src/client/sudoku-board'
 import type { Difficulty } from '@/src/sudoku/types'
 import type { SudokuSummary, SudokuView } from '@/src/sudoku/views'
 
-const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
+const COLORS = ['#6c79ff', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
 const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]
 
 export default function SudokuHome() {
@@ -55,37 +55,52 @@ export default function SudokuHome() {
   const open = list.filter((r) => !r.youAreIn)
 
   const row = (r: SudokuSummary) => (
-    <div key={r.code} className={`flex items-center gap-2.5 rounded-xl border bg-[#1a2537] p-3 ${r.youAreIn ? 'border-accent' : 'border-line'}`}>
+    <div
+      key={r.code}
+      className={`flex items-center gap-3 rounded-[16px] border p-3 ${
+        r.youAreIn
+          ? 'border-accent bg-[linear-gradient(90deg,rgba(108,121,255,0.14),var(--panel))]'
+          : 'border-line bg-panel'
+      }`}
+    >
       <div
-        className="grid size-[30px] flex-none place-items-center rounded-full text-[13px] font-bold text-white"
+        className="grid size-[38px] flex-none place-items-center rounded-[11px] font-display text-sm text-white"
         style={{ background: colorFor(r.code) }}
       >
         {r.code.slice(0, 2)}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{r.name}</div>
-        <div className="text-[13px] text-muted">
+        <div className="truncate font-display text-sm text-white">{r.name}</div>
+        <div className="text-[11px] text-muted">
           {LABEL[r.difficulty]} · {r.youAreIn ? "You're in" : `Host: ${r.hostName}`} · {r.playerCount} joined
           {r.status === 'playing' && (
-            <span className="ml-1 rounded-full border border-[#78591a] bg-panel2 px-2 py-0.5 text-[11px] text-amber-400">In progress</span>
+            <span className="ml-1.5 rounded-md bg-rose-500/15 px-1.5 py-0.5 font-display text-[10px] tracking-wider text-rose-400 uppercase">
+              LIVE
+            </span>
           )}
         </div>
       </div>
       {r.youAreIn ? (
-        <button onClick={() => router.push(`/s/${r.code}`)} className="rounded-[9px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-white">
-          Resume
+        <button
+          onClick={() => router.push(`/s/${r.code}`)}
+          className="arcade-glow rounded-[10px] bg-accent px-3 py-2 font-display text-xs tracking-wider text-white uppercase"
+        >
+          RESUME
         </button>
       ) : r.status === 'lobby' ? (
         <button
           disabled={busy}
           onClick={() => act(`/api/sudoku/${r.code}/join`)}
-          className="rounded-[9px] border border-line bg-panel2 px-3.5 py-2 text-[13px] font-semibold disabled:opacity-50"
+          className="rounded-[10px] bg-emerald-500/15 px-3 py-2 font-display text-xs tracking-wider text-emerald-400 uppercase disabled:opacity-50"
         >
-          Join
+          JOIN ＋
         </button>
       ) : (
-        <button onClick={() => router.push(`/s/${r.code}`)} className="rounded-[9px] border border-line bg-panel2 px-3.5 py-2 text-[13px] font-semibold">
-          View
+        <button
+          onClick={() => router.push(`/s/${r.code}`)}
+          className="rounded-[10px] border border-line bg-panel2 px-3 py-2 font-display text-xs tracking-wider text-white uppercase"
+        >
+          VIEW
         </button>
       )}
     </div>
@@ -93,60 +108,77 @@ export default function SudokuHome() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
-      <div>
-        <button onClick={() => router.push('/')} className="-ml-1 px-1 text-[13px] text-muted">
-          ← Games
-        </button>
-        <div className="text-[22px] font-bold">Sudoku</div>
-        <div className="text-[13px] text-muted">30 minutes · a wrong number costs 30 s</div>
-      </div>
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <button
+            onClick={() => router.push('/')}
+            aria-label="Back to Games"
+            className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
+          >
+            ←
+          </button>
+          <div>
+            <div className="font-display text-xl leading-tight text-white">Sudoku Race</div>
+            <div className="text-xs text-muted">30 minutes · −30 s per mistake</div>
+          </div>
+        </div>
+        <span className="lime-pill">9×9 PUZZLE</span>
+      </header>
 
-      <div className="rounded-2xl border border-line bg-panel p-4">
-        <div className="mb-2.5 text-[11px] uppercase tracking-[0.08em] text-muted">Play solo</div>
+      <div className="rounded-[20px] border border-line bg-panel p-4">
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="font-display text-base text-white">Play Solo</span>
+          <span className="lime-pill">INSTANT</span>
+        </div>
         {solo ? (
-          <button onClick={() => router.push('/sudoku/solo')} className="block w-full rounded-xl bg-accent p-3 text-[15px] font-semibold text-white">
-            Resume solo game ({LABEL[solo.difficulty]})
+          <button
+            onClick={() => router.push('/sudoku/solo')}
+            className="arcade-glow block w-full rounded-xl bg-accent p-3 font-display text-sm tracking-wider text-white uppercase"
+          >
+            RESUME SOLO ({LABEL[solo.difficulty]})
           </button>
         ) : (
           <>
             <DifficultyPicker value={difficulty} onChange={setDifficulty} />
             <button
               onClick={() => router.push(`/sudoku/solo?new=${difficulty}`)}
-              className="mt-3 block w-full rounded-xl bg-accent p-3 text-[15px] font-semibold text-white"
+              className="arcade-glow mt-3 block w-full rounded-xl bg-accent p-3 font-display text-sm tracking-wider text-white uppercase"
             >
-              Start solo game
+              START SOLO GAME ▶
             </button>
           </>
         )}
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-[11px] uppercase tracking-[0.08em] text-muted">Race with friends</div>
+        <div className="font-display text-lg text-white">Race With Friends</div>
         <button
           disabled={busy}
           onClick={() => act('/api/sudoku', { difficulty })}
-          className="rounded-[9px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+          className="arcade-glow rounded-[11px] bg-accent px-3.5 py-2 font-display text-xs tracking-wider text-white uppercase disabled:opacity-50"
         >
-          ＋ Create room
+          ＋ CREATE ROOM
         </button>
       </div>
 
       {rooms.error && !rooms.data && <div className="text-sm text-o">Could not load rooms. Retrying…</div>}
       {mine.map(row)}
       {rooms.data && open.length === 0 && mine.length === 0 && (
-        <div className="py-6 text-center text-sm text-muted">No open rooms yet. Create one!</div>
+        <div className="rounded-2xl border border-line bg-panel py-7 text-center text-sm text-muted">
+          No open rooms yet. Create one!
+        </div>
       )}
       {open.map(row)}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-4 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-line bg-panel p-3 text-sm shadow-lg">
+        <div className="fixed inset-x-4 bottom-4 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-line bg-panel p-3 text-sm shadow-xl">
           <span className="flex-1">{toast.text}</span>
           {toast.code && (
             <button
               onClick={() => router.push(roomPath(toast.code!))}
-              className="rounded-[9px] bg-accent px-3 py-1.5 text-[13px] font-semibold text-white"
+              className="arcade-glow rounded-[10px] bg-accent px-3 py-1.5 font-display text-xs text-white uppercase"
             >
-              Go
+              GO
             </button>
           )}
           <button onClick={() => setToast(null)} aria-label="Dismiss" className="text-muted">

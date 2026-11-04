@@ -1,6 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import { Fredoka, Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+
+const displayFont = Fredoka({
+  subsets: ["latin", "latin-ext"],
+  weight: ["600", "700"],
+  variable: "--font-display",
+});
+
+const sansFont = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "Game Cup",
@@ -11,7 +24,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#0f172a",
+  themeColor: "#121521",
 };
 
 export default function RootLayout({
@@ -20,7 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`h-full antialiased ${displayFont.variable} ${sansFont.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col bg-bg text-text">
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
         {children}

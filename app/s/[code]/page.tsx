@@ -12,11 +12,11 @@ import { sudokuChannel } from '@/src/realtime/channels'
 import type { Difficulty } from '@/src/sudoku/types'
 import type { PlayerState, SudokuPlayerView, SudokuView } from '@/src/sudoku/views'
 
-const BTN = 'block w-full rounded-xl p-[13px] text-center text-[15px] font-semibold disabled:opacity-50'
-const PRIMARY = `${BTN} bg-accent text-white`
+const BTN = 'block w-full rounded-xl p-[13px] text-center font-display text-sm tracking-wider uppercase disabled:opacity-50'
+const PRIMARY = `${BTN} arcade-glow bg-accent text-white`
 const GHOST = `${BTN} border border-line bg-panel2 text-text`
-const CARD = 'rounded-2xl border border-line bg-panel p-4'
-const AVATAR_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
+const CARD = 'rounded-[20px] border border-line bg-panel p-4'
+const AVATAR_COLORS = ['#6c79ff', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '?'
 
 const STATE_LABEL: Record<PlayerState, string> = {
@@ -170,12 +170,16 @@ function Room() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 text-sm text-slate-300">
-        <button onClick={() => router.push('/sudoku')} aria-label="Back to Sudoku" className="-ml-1 px-1 text-lg leading-none">
+      <div className="flex items-center gap-2.5 text-sm">
+        <button
+          onClick={() => router.push('/sudoku')}
+          aria-label="Back to Sudoku"
+          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
+        >
           ←
         </button>
-        <span className="truncate font-semibold">{view.name}</span>
-        <span className="ml-auto rounded-full bg-panel2 px-2 py-0.5 text-[11px] text-muted">{LABEL[view.difficulty]}</span>
+        <span className="truncate font-display text-base text-white">{view.name}</span>
+        <span className="lime-pill ml-auto">{LABEL[view.difficulty]}</span>
       </div>
 
       {blockedBy !== null && (
@@ -247,10 +251,10 @@ function Room() {
 function Avatar({ p, i }: { p: SudokuPlayerView; i: number }) {
   return p.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={p.avatarUrl} alt="" className="size-7 flex-none rounded-full" />
+    <img src={p.avatarUrl} alt="" className="size-8 flex-none rounded-xl border border-lime/60 object-cover" />
   ) : (
     <div
-      className="grid size-7 flex-none place-items-center rounded-full text-xs font-bold text-white"
+      className="grid size-8 flex-none place-items-center rounded-xl font-display text-xs text-white"
       style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
     >
       {initial(p.name)}
@@ -272,41 +276,51 @@ function Lobby({
   const canStart = view.players.length >= 2
   return (
     <>
-      <div className={CARD}>
-        <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-4 shadow-lg">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.08em] text-muted">Room code</div>
-            <div className="font-mono text-2xl font-bold tracking-[0.15em]">{view.code}</div>
+            <div className="font-display text-xs tracking-wider text-muted uppercase">Room Code</div>
+            <div className="font-display text-2xl tracking-[0.18em] text-white">{view.code}</div>
           </div>
           {view.inviteUrl && (
             <button
               onClick={() => shareInvite(view.inviteUrl, `Race me at Sudoku: ${view.name}`)}
-              className="rounded-[9px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-white"
+              className="arcade-glow rounded-xl bg-accent px-3.5 py-2 font-display text-xs tracking-wider text-white uppercase"
             >
-              Share invite link
+              ↗ SHARE LINK
             </button>
           )}
         </div>
       </div>
 
       <div className={CARD}>
-        <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">Difficulty</div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-display text-base text-white">Difficulty</span>
+          <span className="lime-pill">{LABEL[view.difficulty]}</span>
+        </div>
         {view.youAreHost && !readOnly ? (
           <DifficultyPicker value={view.difficulty} disabled={busy} onChange={(d: Difficulty) => void act('difficulty', { difficulty: d })} />
         ) : (
-          <div className="text-sm font-semibold">{LABEL[view.difficulty]}</div>
+          <div className="font-display text-sm text-white">{LABEL[view.difficulty]}</div>
         )}
         <div className="mt-2 text-xs text-muted">Everyone gets the same random puzzle · 30 minutes · −30 s per mistake</div>
       </div>
 
       <div className={CARD}>
-        <div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-muted">Players ({view.players.length})</div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-display text-base text-white">Players</span>
+          <span className="lime-pill">{view.players.length} JOINED</span>
+        </div>
         <div className="flex flex-col gap-2">
           {view.players.map((p, i) => (
             <div key={p.userId} className="flex items-center gap-2.5 text-sm">
               <Avatar p={p} i={i} />
-              <span className="flex-1 truncate">{p.name}</span>
-              {p.isHost && <span className="rounded-full bg-panel2 px-2 py-0.5 text-[11px] text-amber-400">Host</span>}
+              <span className="flex-1 truncate font-display text-white">{p.name}</span>
+              {p.isHost && (
+                <span className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 font-display text-[11px] tracking-wider text-amber-300 uppercase">
+                  Host
+                </span>
+              )}
             </div>
           ))}
         </div>

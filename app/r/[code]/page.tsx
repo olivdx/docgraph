@@ -10,11 +10,11 @@ import { caroRoomChannel } from '@/src/realtime/channels'
 import type { BestOf } from '@/src/tournament/types'
 import type { BracketMatchView, Entrant, RoomView } from '@/src/tournament/views'
 
-const AVATAR_COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2']
-const BTN = 'block w-full rounded-xl p-[13px] text-center text-[15px] font-semibold disabled:opacity-50'
-const PRIMARY = `${BTN} bg-accent text-white`
+const AVATAR_COLORS = ['#6c79ff', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
+const BTN = 'block w-full rounded-xl p-[13px] text-center font-display text-sm tracking-wider uppercase disabled:opacity-50'
+const PRIMARY = `${BTN} arcade-glow bg-accent text-white`
 const GHOST = `${BTN} border border-line bg-panel2 text-text`
-const CARD = 'rounded-2xl border border-line bg-panel p-4'
+const CARD = 'rounded-[20px] border border-line bg-panel p-4'
 
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '?'
 
@@ -22,12 +22,12 @@ function PlayerAvatar({ name, avatarUrl, i }: { name: string; avatarUrl: string 
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={avatarUrl} alt="" className="size-[30px] flex-none rounded-full object-cover" />
+      <img src={avatarUrl} alt="" className="size-8 flex-none rounded-xl border border-lime/60 object-cover" />
     )
   }
   return (
     <div
-      className="grid size-[30px] flex-none place-items-center rounded-full text-[13px] font-bold text-white"
+      className="grid size-8 flex-none place-items-center rounded-xl font-display text-[13px] text-white"
       style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
     >
       {initial(name)}
@@ -182,11 +182,19 @@ function Room() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3.5 p-4">
-      <div className="flex items-center gap-2 text-sm text-slate-300">
-        <button onClick={() => router.push('/caro')} aria-label="Back to rooms" className="-ml-1 px-1 text-lg leading-none">
+      <div className="flex items-center gap-2.5 text-sm">
+        <button
+          onClick={() => router.push('/caro')}
+          aria-label="Back to rooms"
+          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
+        >
           ←
         </button>
-        <span className="truncate font-semibold">{view.name}</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-base text-white">{view.name}</div>
+          <div className="text-[11px] text-muted">Room #{view.code}</div>
+        </div>
+        <span className="lime-pill">{view.status.toUpperCase()}</span>
       </div>
 
       {blockedBy !== null && (
@@ -258,66 +266,83 @@ function Lobby({
   const humans = view.players.filter((p) => !p.isBot).length
   return (
     <>
-      <div className={`${CARD} text-center`}>
-        <div className="text-[13px] text-muted">Room</div>
-        <div className="text-[30px] font-extrabold tracking-[0.25em] text-white">{view.code}</div>
+      <div className="relative overflow-hidden rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-4 text-center shadow-lg">
+        <div className="font-display text-xs tracking-wider text-muted uppercase">Room Code</div>
+        <div className="my-1 font-display text-[32px] tracking-[0.22em] text-white">{view.code}</div>
         {view.inviteUrl && (
           <button
             onClick={() => shareInvite(view.inviteUrl, `Join my Caro Cup tournament "${view.name}"!`)}
-            className={`${GHOST} mt-2.5`}
+            className="arcade-glow mt-2 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-display text-xs tracking-wider text-white uppercase"
           >
-            ↗ Share invite link
+            ↗ SHARE INVITE LINK
           </button>
         )}
       </div>
 
-      <div className={`${CARD} flex items-center justify-between gap-3 py-3`}>
-        <div className="min-w-0">
-          <b className="text-sm">Match format</b>
-          <div className="text-xs text-muted">
-            {view.bestOf === 3 ? 'Best of 3: first to 2 wins, sides swap each game' : 'One game per match'}
-          </div>
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-display text-base text-white">Match Format</span>
+          <span className="lime-pill">{view.isHost && !readOnly ? 'HOST CONTROLS' : `BO${view.bestOf}`}</span>
         </div>
-        {view.isHost && !readOnly ? (
-          <div className="flex flex-none rounded-lg border border-line bg-panel2 p-0.5" role="group" aria-label="Match format">
-            {([1, 3] as const).map((n) => (
-              <button
+        <div className="grid grid-cols-2 gap-2.5" role="group" aria-label="Match format">
+          {(
+            [
+              [1, 'BEST OF 1', 'One game blitz', '⚡'],
+              [3, 'BEST OF 3', 'First to 2 wins', '👑'],
+            ] as const
+          ).map(([n, title, desc, icon]) => {
+            const active = view.bestOf === n
+            const canPick = view.isHost && !readOnly
+            return (
+              <div
                 key={n}
-                type="button"
-                aria-pressed={view.bestOf === n}
-                onClick={() => onFormat(n)}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
-                  view.bestOf === n ? 'bg-accent text-white' : 'text-muted'
-                }`}
+                onClick={() => canPick && onFormat(n)}
+                className={`flex flex-col items-center gap-1.5 rounded-[18px] border bg-gradient-to-b from-panel2 to-panel p-3.5 text-center transition ${
+                  active ? 'border-accent shadow-[inset_0_0_24px_rgba(108,121,255,0.16)]' : 'border-line'
+                } ${canPick ? 'cursor-pointer' : ''}`}
               >
-                Bo{n}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span className="flex-none text-sm font-semibold">Bo{view.bestOf}</span>
-        )}
+                <div className="font-display text-sm leading-tight text-white uppercase">{title}</div>
+                <div className="text-[11px] text-muted">{desc}</div>
+                <div className="my-0.5 text-3xl drop-shadow">{icon}</div>
+                <button
+                  type="button"
+                  disabled={!canPick}
+                  aria-pressed={active}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (canPick) onFormat(n)
+                  }}
+                  className={`w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
+                    active ? 'arcade-glow bg-accent text-white' : 'border border-line bg-bg text-muted'
+                  }`}
+                >
+                  {active ? `ACTIVE · BO${n}` : `SELECT BO${n}`}
+                </button>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className={`${CARD} flex-1`}>
-        <div className="mb-1.5 flex justify-between">
-          <b>Players</b>
-          <span className="text-[13px] text-muted">{view.players.length} joined</span>
+        <div className="mb-2 flex items-center justify-between">
+          <b className="font-display text-base text-white">Players</b>
+          <span className="lime-pill">{view.players.length} JOINED</span>
         </div>
         {view.players.map((p, i) => (
-          <div key={`${p.name}-${i}`} className="flex items-center gap-2.5 border-b border-[#2a3850] py-[9px] last:border-b-0">
+          <div key={`${p.name}-${i}`} className="flex items-center gap-2.5 border-b border-line/60 py-2.5 last:border-b-0">
             <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} i={i} />
-            <div className="min-w-0 flex-1 truncate text-sm">{p.name}</div>
+            <div className="min-w-0 flex-1 truncate font-display text-sm text-white">{p.name}</div>
             {p.isHost && (
-              <span className="rounded-full border border-[#78591a] bg-panel2 px-2 py-0.5 text-[11px] text-amber-400">
+              <span className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 font-display text-[11px] tracking-wider text-amber-300 uppercase">
                 Host
               </span>
             )}
           </div>
         ))}
-        <div className="mt-2.5 text-[13px] text-muted">
+        <div className="mt-2.5 text-xs text-muted">
           On start: {humans} players → {view.slotsIfStartedNow}-slot bracket,{' '}
-          <b className="text-[#a78bfa]">{view.botsIfStartedNow} bots</b> added.
+          <b className="font-display text-[#a78bfa]">{view.botsIfStartedNow} bots</b> added.
         </div>
       </div>
 
@@ -371,18 +396,18 @@ function MatchCard({ m, onOpen }: { m: BracketMatchView; onOpen: (id: string) =>
       disabled={!openable}
       onClick={() => onOpen(m.id)}
       aria-label={openable ? `${m.isYours ? 'Open' : 'Watch'} match #${m.id}` : undefined}
-      className={`block w-[132px] rounded-md border bg-[#1a2537] text-left text-xs enabled:active:scale-[0.98] ${
+      className={`block w-[138px] rounded-xl border bg-panel text-left font-sans text-xs enabled:active:scale-[0.98] ${
         m.isYours ? 'border-accent shadow-[0_0_0_1px_var(--accent)]' : 'border-line'
       }`}
     >
       <Slot e={m.a} score={m.scoreA} won={m.winner === 'a'} lost={m.winner === 'b'} />
-      <div className="border-t border-[#2a3850]">
+      <div className="border-t border-line">
         <Slot e={m.b} score={m.scoreB} won={m.winner === 'b'} lost={m.winner === 'a'} />
       </div>
       {live && (
-        <div className="flex border-t border-dashed border-[#2a3850] px-2 py-[3px] text-[10px] text-amber-400">
-          <span className="flex-1">● Live{m.isYours ? ` · #${m.id}` : ''}</span>
-          {!m.isYours && <span className="text-accent">👁 Watch</span>}
+        <div className="flex border-t border-dashed border-line px-2 py-1 font-display text-[10px] text-lime">
+          <span className="flex-1">● LIVE{m.isYours ? ` · #${m.id}` : ''}</span>
+          {!m.isYours && <span className="text-accent">WATCH</span>}
         </div>
       )}
     </button>
@@ -394,15 +419,17 @@ function Bracket({ view, onEnter }: { view: RoomView; onEnter: (id: string) => v
   const oppIsBot = ym ? view.players.some((p) => p.isBot && p.name === ym.opponentName) : false
   return (
     <>
-      <div className="flex items-baseline justify-between">
-        <div className="text-[19px] font-bold">Bracket</div>
-        <span className="text-[13px] text-muted">{view.bestOf === 3 ? 'Best of 3' : 'Best of 1'}</span>
+      <div className="flex items-center justify-between">
+        <div className="font-display text-lg text-white">Tournament Bracket</div>
+        <span className="lime-pill">{view.bestOf === 3 ? 'BEST OF 3' : 'BEST OF 1'}</span>
       </div>
       <div className="-mx-4 overflow-x-auto px-4 pb-1.5">
         <div className="flex w-max items-center gap-[18px]">
           {view.rounds.map((r) => (
             <div key={r.name} className="flex flex-col gap-3.5">
-              <h4 className="mb-1 rounded-md bg-panel2 p-[7px] text-center text-xs font-semibold">{r.name}</h4>
+              <h4 className="mb-1 rounded-lg bg-panel2 p-2 text-center font-display text-xs tracking-wider text-white uppercase">
+                {r.name}
+              </h4>
               {r.matches.map((m) => (
                 <MatchCard key={m.id} m={m} onOpen={onEnter} />
               ))}
@@ -410,16 +437,16 @@ function Bracket({ view, onEnter }: { view: RoomView; onEnter: (id: string) => v
           ))}
         </div>
       </div>
-      {view.rounds.length > 2 && <div className="text-[13px] text-muted">← swipe for later rounds</div>}
+      {view.rounds.length > 2 && <div className="text-xs text-muted">← swipe for later rounds</div>}
       {ym && (
-        <div className={`${CARD} border-accent`}>
-          <div className="mb-1 font-semibold">Your match is ready</div>
+        <div className={`${CARD} border-accent bg-[linear-gradient(90deg,rgba(108,121,255,0.14),var(--panel))]`}>
+          <div className="mb-1 font-display text-base text-white">Your match is ready</div>
           <div className="mb-2.5 text-[13px] text-muted">
             You ({ym.youAre === 'X' ? '✕' : '○'}) vs {oppIsBot ? '🤖 ' : ''}
             {ym.opponentName} · match #{ym.id}
           </div>
           <button onClick={() => onEnter(ym.id)} className={PRIMARY}>
-            Enter match →
+            ENTER MATCH →
           </button>
         </div>
       )}

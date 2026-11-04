@@ -59,11 +59,16 @@ function Solo() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 text-sm text-slate-300">
-        <button onClick={() => router.push('/sudoku')} aria-label="Back" className="-ml-1 px-1 text-lg leading-none">
+      <div className="flex items-center gap-2.5 text-sm">
+        <button
+          onClick={() => router.push('/sudoku')}
+          aria-label="Back"
+          className="grid size-9 flex-none place-items-center rounded-xl border border-line bg-panel font-display text-base text-white"
+        >
           ←
         </button>
-        <span className="font-semibold">Solo · {LABEL[game.difficulty]}</span>
+        <span className="font-display text-base text-white">Solo Sudoku</span>
+        <span className="lime-pill ml-auto">{LABEL[game.difficulty]}</span>
       </div>
 
       {over ? (
@@ -93,19 +98,27 @@ function SoloResult({ game, onNew, onHome }: { game: SoloGame; onNew: () => void
   const solved = game.finishedAt !== null
   return (
     <>
-      <div className="rounded-2xl border border-line bg-panel p-4 text-center">
+      <div className="rounded-[20px] border border-line bg-panel p-4 text-center">
         <div className="text-4xl">{solved ? '🎉' : game.outReason === 'gave_up' ? '🏳️' : '⏰'}</div>
-        <div className="mt-1 text-lg font-bold">{solved ? 'Solved!' : game.outReason === 'gave_up' ? 'You gave up' : "Time's up"}</div>
+        <div className="mt-1 font-display text-lg text-white uppercase">
+          {solved ? 'Solved!' : game.outReason === 'gave_up' ? 'You gave up' : "Time's up"}
+        </div>
         <div className="mt-1 text-[13px] text-muted">
           {solved ? `Time ${formatClock(game.finishedAt! - game.startedAt)}` : `${filled} / ${toFill} cells`} · {game.mistakes} mistake
           {game.mistakes === 1 ? '' : 's'}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button onClick={onNew} className="rounded-xl bg-accent p-3 text-[15px] font-semibold text-white">
-            New game
+          <button
+            onClick={onNew}
+            className="arcade-glow rounded-xl bg-accent p-3 font-display text-sm tracking-wider text-white uppercase"
+          >
+            NEW GAME
           </button>
-          <button onClick={onHome} className="rounded-xl border border-line bg-panel2 p-3 text-[15px] font-semibold">
-            Home
+          <button
+            onClick={onHome}
+            className="rounded-xl border border-line bg-panel2 p-3 font-display text-sm tracking-wider text-white uppercase"
+          >
+            HOME
           </button>
         </div>
       </div>

@@ -321,17 +321,24 @@ export default function MatchPage() {
 
   return (
     <main className="mx-auto flex h-dvh w-full max-w-md flex-col gap-2.5 p-4">
-      <div className="flex items-center justify-between text-sm text-slate-300">
-        <button onClick={toBracket} className="-ml-1 truncate px-1 text-left">
-          ← {view.roundName} · #{view.id}
-        </button>
-        {view.you === null && (
-          <span className="rounded-full border border-accent/50 bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
-            👁 Watching
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <button
+          onClick={toBracket}
+          className="flex min-w-0 items-center gap-2 text-left font-display text-sm text-white"
+        >
+          <span className="grid size-8 flex-none place-items-center rounded-xl border border-line bg-panel text-sm">
+            ←
           </span>
-        )}
-        <button onClick={toBracket} className="text-muted">
-          Bracket
+          <span className="truncate">
+            {view.roundName} · #{view.id}
+          </span>
+        </button>
+        {view.you === null && <span className="lime-pill">● WATCHING</span>}
+        <button
+          onClick={toBracket}
+          className="rounded-lg border border-line bg-panel px-2.5 py-1 font-display text-xs tracking-wider text-muted uppercase hover:text-white"
+        >
+          BRACKET
         </button>
       </div>
 
@@ -354,26 +361,30 @@ export default function MatchPage() {
           return (
             <div
               key={s}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border bg-panel px-2.5 py-2 ${
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-[16px] border bg-panel px-3 py-2.5 ${
                 active ? 'border-accent shadow-[0_0_0_1px_var(--accent)]' : 'border-line'
               }`}
             >
               <Mark side={s} size={20} />
               <div className="min-w-0 text-xs leading-[1.3]">
-                <b className="block truncate">{label}</b>
-                <span className="text-muted">{status}</span>
+                <b className="block truncate font-display text-white">{label}</b>
+                <span className="text-[11px] text-muted">{status}</span>
               </div>
               {bo3 && (
                 <span
                   aria-label={`${view.score[s]} games won`}
-                  className="flex-none rounded-md bg-panel2 px-1.5 py-0.5 text-xs font-bold tabular-nums"
+                  className="flex-none rounded-md bg-panel2 px-1.5 py-0.5 font-display text-xs tabular-nums text-white"
                 >
                   {view.score[s]}
                 </span>
               )}
               <span
-                className={`ml-auto text-[15px] font-bold tabular-nums ${
-                  active ? (turnLeft !== null && turnLeft <= 5_000 ? 'text-o' : '') : 'text-muted'
+                className={`ml-auto rounded-lg px-2 py-0.5 font-display text-sm tabular-nums ${
+                  active
+                    ? turnLeft !== null && turnLeft <= 5_000
+                      ? 'bg-rose-500/15 text-o'
+                      : 'bg-[var(--lime-bg)] text-lime'
+                    : 'text-muted'
                 }`}
               >
                 {time}
@@ -487,12 +498,12 @@ function Result({
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-bg/70 p-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4 text-center shadow-xl">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-bg/75 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-sm rounded-[22px] border border-line bg-panel p-5 text-center shadow-2xl">
         <div className="text-[40px]">{lost ? '😔' : view.nextStep === 'champion' ? '🏆' : '🎉'}</div>
-        <div className="text-[22px] font-bold">{title}</div>
+        <div className="font-display text-[22px] text-white uppercase">{title}</div>
         {view.bestOf === 3 && (
-          <div className="mt-1 text-[15px] font-bold tabular-nums">
+          <div className="mt-1 font-display text-[15px] tabular-nums text-lime">
             {you
               ? `${view.score[you]} – ${view.score[opposite(you)]}`
               : `${view.players.X?.name ?? '?'} ${view.score.X} – ${view.score.O} ${view.players.O?.name ?? '?'}`}
@@ -502,23 +513,26 @@ function Result({
           {[reason, next].filter(Boolean).join(' · ')}
         </div>
         {onNext && (
-          <div className="mb-2.5 rounded-xl border border-accent p-3">
-            <div className="mb-2 font-semibold">Your next match is ready</div>
-            <button onClick={onNext} className="block w-full rounded-xl bg-accent p-[13px] text-[15px] font-semibold text-white">
-              Enter match →
+          <div className="mb-2.5 rounded-2xl border border-accent bg-[linear-gradient(90deg,rgba(108,121,255,0.14),var(--panel))] p-3">
+            <div className="mb-2 font-display text-sm text-white">Your next match is ready</div>
+            <button
+              onClick={onNext}
+              className="arcade-glow block w-full rounded-xl bg-accent p-[13px] font-display text-sm tracking-wider text-white uppercase"
+            >
+              ENTER MATCH →
             </button>
           </div>
         )}
         <button
           onClick={onBracket}
-          className={`block w-full rounded-xl p-[13px] text-[15px] font-semibold ${
-            onNext ? 'border border-line bg-panel2 text-text' : 'bg-accent text-white'
+          className={`block w-full rounded-xl p-[13px] font-display text-sm tracking-wider uppercase ${
+            onNext ? 'border border-line bg-panel2 text-text' : 'arcade-glow bg-accent text-white'
           }`}
         >
-          View bracket
+          VIEW BRACKET
         </button>
-        <button onClick={onClose} className="mt-2 text-[13px] text-muted underline">
-          View board
+        <button onClick={onClose} className="mt-2 font-display text-xs tracking-wider text-muted uppercase underline">
+          VIEW BOARD
         </button>
       </div>
     </div>

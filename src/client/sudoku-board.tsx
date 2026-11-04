@@ -199,14 +199,16 @@ export function DifficultyPicker({
   disabled?: boolean
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-panel2 p-1">
+    <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-line bg-bg p-1">
       {DIFFICULTIES.map((d) => (
         <button
           key={d}
           type="button"
           disabled={disabled}
           onClick={() => onChange(d)}
-          className={`rounded-lg py-2 text-sm font-semibold ${value === d ? 'bg-accent text-white' : 'text-muted'} disabled:cursor-default`}
+          className={`rounded-lg py-2 font-display text-xs tracking-wider uppercase transition ${
+            value === d ? 'arcade-glow bg-accent text-white' : 'text-muted'
+          } disabled:cursor-default`}
         >
           {LABEL[d]}
         </button>
