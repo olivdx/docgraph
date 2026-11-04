@@ -200,7 +200,7 @@ function Room() {
               className="rounded-[10px] bg-accent px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
               title={lobbyHumans < 2 ? 'Need at least 2 players' : undefined}
             >
-              ▶ START
+              START
             </button>
             <button
               type="button"

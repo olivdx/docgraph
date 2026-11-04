@@ -363,7 +363,7 @@ export default function MatchPage() {
             <div
               key={s}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-[16px] border bg-panel px-3 py-2.5 ${
-                active ? 'border-accent shadow-[0_0_0_1px_var(--accent)]' : 'border-line'
+                active ? 'border-accent' : 'border-line'
               }`}
             >
               <Mark side={s} size={20} />

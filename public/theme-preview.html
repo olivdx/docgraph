@@ -854,10 +854,9 @@
     }
     .board-frame {
       background: #161929;
-      border: 2px solid rgba(108, 121, 255, 0.28);
+      border: 1px solid var(--line);
       border-radius: 22px;
       padding: 12px;
-      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
     }
     .caro-grid {
       display: grid;
@@ -881,15 +880,13 @@
     }
     .caro-cell.x {
       color: #60a5fa;
-      text-shadow: 0 0 10px rgba(96, 165, 250, 0.55);
     }
     .caro-cell.o {
       color: #fb7185;
-      text-shadow: 0 0 10px rgba(251, 113, 133, 0.55);
     }
     .caro-cell.last {
-      background: rgba(108, 121, 255, 0.22);
-      border-color: var(--primary-bright);
+      background: rgba(108, 121, 255, 0.12);
+      border-color: rgba(108, 121, 255, 0.35);
     }
   </style>
 </head>
@@ -1077,7 +1074,7 @@
             <span>Room #M7AJBW</span>
           </div>
           <div class="hdr-actions">
-            <button type="button" class="hdr-start">▶ START</button>
+            <button type="button" class="hdr-start">START</button>
             <button type="button" class="hdr-close">CLOSE</button>
           </div>
         </div>
@@ -1160,8 +1157,8 @@
 
       <header class="app-header">
         <div class="brand">
-          <div class="brand-logo">←</div>
-          <div>
+          <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div style="min-width:0">
             <div class="brand-title">Semifinal · Game 1</div>
             <div class="brand-sub">Best of 3 · First to 2</div>
           </div>

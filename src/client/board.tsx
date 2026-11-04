@@ -15,8 +15,8 @@ import {
 } from './board-geometry'
 import { Mark } from './marks'
 
-const LAST_MOVE_BG = 'rgba(59,130,246,.18)'
-const WIN_BG = 'rgba(34,197,94,.30)'
+const LAST_MOVE_BG = 'rgba(59,130,246,.10)'
+const WIN_BG = 'rgba(34,197,94,.18)'
 const GLIDE = 'transform 320ms ease'
 
 interface Props {
