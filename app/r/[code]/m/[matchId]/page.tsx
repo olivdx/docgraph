@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeftIcon } from '@/src/client/back-button'
 import { MatchResultOverlay } from '@/src/client/match-result-overlay'
+import { RematchPanel } from '@/src/client/rematch-panel'
 import { markNavBack } from '@/src/client/nav-direction'
 import { ApiError, apiGet, apiPost } from '@/src/client/api'
 import { Board } from '@/src/client/board'
@@ -34,6 +35,7 @@ const loserReason = (loser: string): Record<EndReason, string> => ({
   resign: `${loser} resigned`,
   no_show: `${loser} didn't show up`,
   board_full: 'Board full',
+  left: `${loser} left`,
 })
 
 const opposite = (s: Side): Side => (s === 'X' ? 'O' : 'X')
@@ -57,7 +59,13 @@ function nextPollDelay(v: MatchView | null, live: boolean): number | null {
       if (!opp || opp.isBot) return POLL_MS
       base = LIVE_POLL_MS
     }
-    const deadlines = [v.turnRemainingMs, v.pendingRemainingMs, v.opponentReconnectRemainingMs, v.nextGameRemainingMs].filter(
+    const deadlines = [
+      v.turnRemainingMs,
+      v.pendingRemainingMs,
+      v.opponentReconnectRemainingMs,
+      v.nextGameRemainingMs,
+      v.rematch?.remainingMs ?? null,
+    ].filter(
       (d): d is number => d !== null && d >= 0,
     )
     return Math.min(base, ...deadlines.map((d) => d + DEADLINE_SLACK_MS))
@@ -250,7 +258,9 @@ export default function MatchPage() {
   )
 
   const resign = useCallback(async () => {
-    if (!state?.view.you || !window.confirm('Resign this match? Your opponent wins.')) return
+    const free = state?.view.mode === 'free'
+    const question = free ? 'Resign this game? Your opponent gets the point.' : 'Resign this match? Your opponent wins.'
+    if (!state?.view.you || !window.confirm(question)) return
     try {
       const v = await apiPost<MatchView>(`${path}/resign`)
       apply(++seq.current, v)
@@ -259,7 +269,27 @@ export default function MatchPage() {
     }
   }, [state, path, apply])
 
-  const toBracket = () => router.push(`/r/${code}`)
+  // Free play: rematch after a game, or leave (which ends the room for both players).
+  const [freeBusy, setFreeBusy] = useState(false)
+  const freeAction = useCallback(
+    async (action: 'rematch' | 'leave') => {
+      if (!state?.view.you || freeBusy) return
+      if (action === 'leave' && !window.confirm('Leave free play? The room ends for both of you.')) return
+      setFreeBusy(true)
+      try {
+        const v = await apiPost<MatchView>(`${path}/${action}`)
+        apply(++seq.current, v)
+      } catch {
+        setToast(action === 'rematch' ? 'Could not start a rematch. Try again.' : 'Could not leave. Try again.')
+      } finally {
+        setFreeBusy(false)
+      }
+    },
+    [state, freeBusy, path, apply],
+  )
+
+  // Free play has no bracket: "back" goes to the room list.
+  const toBracket = () => router.push(state?.view.mode === 'free' ? '/caro' : `/r/${code}`)
 
   if (!state) {
     return (
@@ -291,6 +321,8 @@ export default function MatchPage() {
   const reconnectLeft = left(view.opponentReconnectRemainingMs)
   const nextGameLeft = left(view.nextGameRemainingMs)
   const bo3 = view.bestOf === 3
+  const free = view.mode === 'free'
+  const rematchLeft = left(view.rematch?.remainingMs ?? null)
   const sides: Side[] = view.you === 'O' ? ['O', 'X'] : ['X', 'O']
   const oppName = view.you ? (view.players[opposite(view.you)]?.name ?? 'opponent') : null
   const finished = view.status === 'finished'
@@ -309,16 +341,20 @@ export default function MatchPage() {
             <ChevronLeftIcon size={18} />
           </span>
           <span className="truncate">
-            {view.roundName} · #{view.id}
+            {free ? 'Free play' : view.roundName} · #{view.id}
           </span>
         </button>
         {view.you === null && <span className="lime-pill">● WATCHING</span>}
-        <button
-          onClick={toBracket}
-          className="rounded-lg border border-line bg-panel px-2.5 py-1 font-display text-xs tracking-wider text-muted uppercase hover:text-white"
-        >
-          BRACKET
-        </button>
+        {free ? (
+          <span className="lime-pill">FREE PLAY</span>
+        ) : (
+          <button
+            onClick={toBracket}
+            className="rounded-lg border border-line bg-panel px-2.5 py-1 font-display text-xs tracking-wider text-muted uppercase hover:text-white"
+          >
+            BRACKET
+          </button>
+        )}
       </div>
 
       <div className="flex items-stretch gap-2">
@@ -357,7 +393,7 @@ export default function MatchPage() {
                 </div>
                 <span className="mt-0.5 block text-[11px] leading-tight text-muted">{status}</span>
               </div>
-              {bo3 ? (
+              {bo3 || free ? (
                 <span
                   aria-label={`${view.score[s]} games won`}
                   className="flex-none self-center rounded-md bg-panel2 px-1.5 py-0.5 font-display text-xs tabular-nums text-white"
@@ -381,7 +417,7 @@ export default function MatchPage() {
         })}
       </div>
 
-      {view.lastGame && !finished && (
+      {view.lastGame && !finished && view.nextGameRemainingMs !== null && (
         <div className="rounded-[10px] border border-accent/50 bg-accent/15 px-2.5 py-2 text-center text-xs">
           <b>
             Game {view.gameNo}:{' '}
@@ -417,11 +453,22 @@ export default function MatchPage() {
 
       <div className="flex items-center justify-between gap-2 text-xs text-muted">
         <span>
-          {bo3 ? `Game ${view.gameNo} of 3 · ` : ''}Move {view.moves.length}
-          {bo3 ? '' : ' · blocked-ends rule'}
+          {bo3 ? `Game ${view.gameNo} of 3 · ` : free ? `Game ${view.gameNo} · ` : ''}Move {view.moves.length}
+          {bo3 || free ? '' : ' · blocked-ends rule'}
         </span>
         <span>#{view.id}</span>
-        {view.you && !finished ? (
+        {view.you && !finished && free ? (
+          <span className="flex gap-3">
+            {view.turn !== null && (
+              <button onClick={() => void resign()} className="text-[#fca5a5]">
+                Resign
+              </button>
+            )}
+            <button onClick={() => void freeAction('leave')} disabled={freeBusy} className="text-muted underline">
+              Leave
+            </button>
+          </span>
+        ) : view.you && !finished ? (
           <button onClick={() => void resign()} className="text-[#fca5a5]">
             Resign
           </button>
@@ -433,6 +480,16 @@ export default function MatchPage() {
           <span />
         )}
       </div>
+
+      {!finished && view.rematch && (
+        <RematchPanel
+          view={view}
+          remainingMs={rematchLeft ?? 0}
+          busy={freeBusy}
+          onRematch={() => void freeAction('rematch')}
+          onLeave={() => void freeAction('leave')}
+        />
+      )}
 
       {finished && !resultHidden && (
         <MatchResultOverlay

@@ -9,12 +9,15 @@ import {
   leaveRoom,
   markReady,
   playMove,
-  setBestOf,
+  setFormat,
+  setBotLevel,
+  acceptRematch as acceptRematchCmd,
+  leaveMatch as leaveMatchCmd,
   resign as resignCmd,
   settleRoom,
   startRoom,
 } from '@/src/tournament/room'
-import { RoomError, type BestOf, type Room } from '@/src/tournament/types'
+import { isMatchFormat, RoomError, type BotLevel, type MatchFormat, type Room } from '@/src/tournament/types'
 import {
   toMatchView,
   toRoomSummary,
@@ -67,7 +70,9 @@ interface Mutated {
 function bracketShape(room: Room): string {
   return JSON.stringify([
     room.status,
+    room.mode,
     room.bestOf,
+    room.botLevel,
     room.name,
     room.players,
     room.placements,
@@ -151,8 +156,13 @@ export class RoomService {
     return this.roomView(room, user, now)
   }
 
-  async setFormat(code: string, user: TelegramUser, bestOf: BestOf): Promise<RoomView> {
-    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => setBestOf(settled(), user.id, bestOf))
+  async setFormat(code: string, user: TelegramUser, format: MatchFormat): Promise<RoomView> {
+    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => setFormat(settled(), user.id, format))
+    return this.roomView(room, user, now)
+  }
+
+  async setBotLevel(code: string, user: TelegramUser, level: BotLevel): Promise<RoomView> {
+    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => setBotLevel(settled(), user.id, level))
     return this.roomView(room, user, now)
   }
 
@@ -187,6 +197,26 @@ export class RoomService {
         playMove(loaded, matchId, user.id, cell, clientMoveNo, t, this.deps.rng, p, { fullBotMatchId: matchId }),
       { matchId, userId: user.id },
       (loaded, next, now) => this.signalMove(matchId, loaded, next, now),
+    )
+    return toMatchView(res.room, matchId, user.id, res.now, res.presence)
+  }
+
+  /** Free play: accept a rematch after a game. */
+  async acceptRematch(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
+    const res = await this.mutate(
+      code,
+      (loaded, p, t) => acceptRematchCmd(loaded, matchId, user.id, t, this.deps.rng, p, { fullBotMatchId: matchId }),
+      { matchId, userId: user.id },
+    )
+    return toMatchView(res.room, matchId, user.id, res.now, res.presence)
+  }
+
+  /** Free play: leave the match, which ends the room. */
+  async leaveMatch(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {
+    const res = await this.mutate(
+      code,
+      (loaded, p, t) => leaveMatchCmd(loaded, matchId, user.id, t, this.deps.rng, p, { fullBotMatchId: matchId }),
+      { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
   }

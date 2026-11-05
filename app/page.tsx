@@ -63,62 +63,66 @@ export default function GamePicker() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4">
-      <header className="flex items-center justify-between gap-2.5">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="arcade-glow grid size-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-[#6c79ff] to-[#a855f7] font-display text-lg text-white">
-            🏆
-          </div>
-          <div className="min-w-0">
-            <div className="font-display text-[17px] leading-tight text-white">Game Cup</div>
-            <div className="truncate text-xs font-semibold text-muted">
-              {firstName ? `Hi, ${firstName}` : 'Telegram Arcade'}
+      {/* Header + hero, with snow falling behind them; it fades out just above "Originals Games". */}
+      <div className="relative isolate flex flex-col gap-4">
+        <div aria-hidden className="snowfall absolute -inset-x-4 -top-4 -bottom-4 -z-10" />
+        <header className="flex items-center justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="arcade-glow grid size-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-[#6c79ff] to-[#a855f7] font-display text-lg text-white">
+              🏆
+            </div>
+            <div className="min-w-0">
+              <div className="font-display text-[17px] leading-tight text-white">Game Cup</div>
+              <div className="truncate text-xs font-semibold text-muted">
+                {firstName ? `Hi, ${firstName}` : 'Telegram Arcade'}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {active && (
-            <button
-              onClick={() => router.push(activePath(active))}
-              className="flex items-center gap-1.5 rounded-xl border border-line bg-panel px-2.5 py-1.5 font-display text-xs text-white"
-            >
-              <span className="size-2 rounded-full bg-lime shadow-[0_0_8px_var(--lime)]" />
-              <span>{active.code}</span>
-            </button>
-          )}
-          {user?.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.avatarUrl}
-              alt=""
-              className="size-9 flex-none rounded-xl border-2 border-lime object-cover"
-            />
-          ) : (
-            <div className="grid size-9 flex-none place-items-center rounded-xl border-2 border-lime bg-gradient-to-br from-lime-400 to-emerald-500 font-display text-sm font-bold text-slate-900">
-              {initial}
-            </div>
-          )}
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            {active && (
+              <button
+                onClick={() => router.push(activePath(active))}
+                className="flex items-center gap-1.5 rounded-xl border border-line bg-panel px-2.5 py-1.5 font-display text-xs text-white"
+              >
+                <span className="size-2 rounded-full bg-lime shadow-[0_0_8px_var(--lime)]" />
+                <span>{active.code}</span>
+              </button>
+            )}
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatarUrl}
+                alt=""
+                className="size-9 flex-none rounded-xl border-2 border-lime object-cover"
+              />
+            ) : (
+              <div className="grid size-9 flex-none place-items-center rounded-xl border-2 border-lime bg-gradient-to-br from-lime-400 to-emerald-500 font-display text-sm font-bold text-slate-900">
+                {initial}
+              </div>
+            )}
+          </div>
+        </header>
 
-      <div className="glow-clip relative rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-5 shadow-lg">
-        <div className="pointer-events-none absolute -right-2 -bottom-2 grid size-32 -rotate-6 place-items-center text-[64px] drop-shadow-lg">
-          ❄️
+        <div className="glow-clip relative rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-5 shadow-lg">
+          <div className="pointer-events-none absolute -right-2 -bottom-2 grid size-32 -rotate-6 place-items-center text-[64px] drop-shadow-lg">
+            ❄️
+          </div>
+          <div className="max-w-[225px] font-display text-[22px] leading-[1.08] tracking-wide text-white uppercase">
+            {active ? `YOUR ${active.game.toUpperCase()} ROOM IS LIVE!` : 'GAME CUP TOURNAMENT INVITES YOU!'}
+          </div>
+          <div className="mt-2">
+            <span className="lime-pill">● {active ? `ACTIVE · ${active.code}` : '2 GAMES · INSTANT PLAY'}</span>
+          </div>
+          <button
+            onClick={() => router.push(active ? activePath(active) : '/caro')}
+            className="mt-3.5 inline-flex items-center gap-2.5 rounded-xl border border-[#8b95ff]/45 bg-[#6c79ff]/25 py-2 pr-3.5 pl-2 font-display text-xs font-bold tracking-wider text-white uppercase"
+          >
+            <span className="grid size-7 place-items-center rounded-lg bg-accent text-white shadow-[0_2px_6px_rgba(108,121,255,0.35)]">
+              ▶
+            </span>
+            <span>{active ? `RESUME ${active.code}` : 'EXPLORE TOURNAMENTS'}</span>
+          </button>
         </div>
-        <div className="max-w-[225px] font-display text-[22px] leading-[1.08] tracking-wide text-white uppercase">
-          {active ? `YOUR ${active.game.toUpperCase()} ROOM IS LIVE!` : 'GAME CUP TOURNAMENT INVITES YOU!'}
-        </div>
-        <div className="mt-2">
-          <span className="lime-pill">● {active ? `ACTIVE · ${active.code}` : '2 GAMES · INSTANT PLAY'}</span>
-        </div>
-        <button
-          onClick={() => router.push(active ? activePath(active) : '/caro')}
-          className="mt-3.5 inline-flex items-center gap-2.5 rounded-xl border border-[#8b95ff]/45 bg-[#6c79ff]/25 py-2 pr-3.5 pl-2 font-display text-xs font-bold tracking-wider text-white uppercase"
-        >
-          <span className="grid size-7 place-items-center rounded-lg bg-accent text-white shadow-[0_2px_6px_rgba(108,121,255,0.35)]">
-            ▶
-          </span>
-          <span>{active ? `RESUME ${active.code}` : 'EXPLORE TOURNAMENTS'}</span>
-        </button>
       </div>
 
       <div className="flex items-center justify-between">

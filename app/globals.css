@@ -104,3 +104,45 @@ button {
   0% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-18px); }
 }
+
+/* Light snowfall behind the top of Home (header + hero), fading out over its last 130px so it is
+   gone by the "Originals Games" heading. Pure CSS: tiled dots, each layer falling a whole number
+   of its tiles per loop (seamless). Far = small + slow, near = bigger + faster. */
+.snowfall {
+  pointer-events: none;
+  opacity: 0.75;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 130px), transparent);
+  background-image:
+    radial-gradient(circle 2.4px at 123px 127px, rgba(255, 255, 255, 0.55) 0.5px, transparent),
+    radial-gradient(circle 2.4px at 123px 138px, rgba(255, 255, 255, 0.55) 0.5px, transparent),
+    radial-gradient(circle 2.5px at 158px 56px, rgba(255, 255, 255, 0.6) 0.6px, transparent),
+    radial-gradient(circle 2.5px at 55px 139px, rgba(255, 255, 255, 0.6) 0.6px, transparent),
+    radial-gradient(circle 2.6px at 129px 169px, rgba(255, 255, 255, 0.55) 0.6px, transparent),
+    radial-gradient(circle 2.6px at 165px 55px, rgba(255, 255, 255, 0.55) 0.6px, transparent),
+    radial-gradient(circle 2.9px at 32px 122px, rgba(255, 255, 255, 0.7) 0.8px, transparent),
+    radial-gradient(circle 2.9px at 85px 44px, rgba(255, 255, 255, 0.7) 0.8px, transparent),
+    radial-gradient(circle 3.0px at 54px 29px, rgba(255, 255, 255, 0.65) 0.8px, transparent),
+    radial-gradient(circle 3.0px at 210px 239px, rgba(255, 255, 255, 0.65) 0.8px, transparent),
+    radial-gradient(circle 3.2px at 323px 88px, rgba(255, 255, 255, 0.7) 0.9px, transparent),
+    radial-gradient(circle 3.2px at 327px 15px, rgba(255, 255, 255, 0.7) 0.9px, transparent),
+    radial-gradient(circle 3.5px at 278px 40px, rgba(255, 255, 255, 0.8) 1.0px, transparent),
+    radial-gradient(circle 3.5px at 38px 26px, rgba(255, 255, 255, 0.8) 1.0px, transparent),
+    radial-gradient(circle 3.8px at 105px 131px, rgba(255, 255, 255, 0.75) 1.2px, transparent),
+    radial-gradient(circle 3.8px at 315px 23px, rgba(255, 255, 255, 0.75) 1.2px, transparent),
+    radial-gradient(circle 4.1px at 406px 245px, rgba(255, 255, 255, 0.85) 1.3px, transparent),
+    radial-gradient(circle 4.1px at 175px 233px, rgba(255, 255, 255, 0.85) 1.3px, transparent);
+  background-size: 157px 157px, 157px 157px, 193px 181px, 193px 181px, 229px 211px, 229px 211px, 263px 241px, 263px 241px, 311px 283px, 311px 283px, 347px 331px, 347px 331px, 383px 367px, 383px 367px, 461px 419px, 461px 419px, 509px 487px, 509px 487px;
+  animation: snowfall 40s linear infinite;
+}
+
+@keyframes snowfall {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 157px 314px, 157px 314px, -193px 362px, -193px 362px, 229px 422px, 229px 422px, 0px 723px, 0px 723px, -311px 849px, -311px 849px, 347px 993px, 347px 993px, 0px 1468px, 0px 1468px, 0px 1676px, 0px 1676px, 509px 1948px, 509px 1948px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snowfall {
+    animation: none;
+  }
+}

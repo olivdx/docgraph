@@ -14,6 +14,7 @@ const WIN_REASON: Record<EndReason, string> = {
   resign: 'Opponent resigned',
   no_show: "Opponent didn't show up",
   board_full: 'Board full',
+  left: 'Opponent left',
 }
 const LOSE_REASON: Record<EndReason, string> = {
   five_in_row: 'Opponent made open five',
@@ -22,6 +23,7 @@ const LOSE_REASON: Record<EndReason, string> = {
   resign: 'You resigned',
   no_show: "You didn't show up",
   board_full: 'Board full',
+  left: 'You left',
 }
 const loserReason = (loser: string): Record<EndReason, string> => ({
   five_in_row: 'Open five',
@@ -30,6 +32,7 @@ const loserReason = (loser: string): Record<EndReason, string> => ({
   resign: `${loser} resigned`,
   no_show: `${loser} didn't show up`,
   board_full: 'Board full',
+  left: `${loser} left`,
 })
 
 const ROUND_ORDER = ['Quarterfinal', 'Semifinal', 'Final']
@@ -73,14 +76,20 @@ export function MatchResultOverlay({ view, onBracket, onNext, onClose }: Props) 
     : winnerName
       ? `${winnerName} wins`
       : 'Match over'
-  const reason = endReason
-    ? you
-      ? (won ? WIN_REASON : LOSE_REASON)[endReason]
-      : loserReason(loserName)[endReason]
-    : null
+  const free = view.mode === 'free'
+  // Free play is decided on score, so whoever left or dropped is not necessarily the loser.
+  const reason = !endReason
+    ? null
+    : free && endReason === 'left'
+      ? 'Free play ended'
+      : free && endReason === 'disconnect_timeout'
+        ? 'A player disconnected'
+        : you
+          ? (won ? WIN_REASON : LOSE_REASON)[endReason]
+          : loserReason(loserName)[endReason]
 
   let next: string | null = null
-  if (you) {
+  if (you && !free) {
     if (view.nextStep === 'champion') next = 'Champion!'
     else if (view.nextStep === 'eliminated') next = "You're out. Thanks for playing!"
     else if (view.nextStep === 'next_match')
@@ -126,7 +135,7 @@ export function MatchResultOverlay({ view, onBracket, onNext, onClose }: Props) 
       >
         <div className="result-emoji text-[40px]">{emoji}</div>
         <div className="result-stagger font-display text-[22px] text-white uppercase">{title}</div>
-        {view.bestOf === 3 && (
+        {(view.bestOf === 3 || free) && (
           <div className="result-stagger mt-1 font-display text-[15px] tabular-nums text-lime">
             {you
               ? `${view.score[you]} – ${view.score[opposite(you)]}`
@@ -155,7 +164,7 @@ export function MatchResultOverlay({ view, onBracket, onNext, onClose }: Props) 
             onNext ? 'border border-line bg-panel2 text-text' : 'arcade-glow bg-accent text-white'
           }`}
         >
-          VIEW BRACKET
+          {free ? 'BACK TO ROOMS' : 'VIEW BRACKET'}
         </button>
         <button
           type="button"

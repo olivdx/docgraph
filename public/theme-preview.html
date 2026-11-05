@@ -1271,6 +1271,70 @@
       color: var(--muted);
       cursor: pointer;
     }
+    /* ---- Light snowfall behind the Home screen's top (toggle: .stage.snow-off) ----
+       Pure CSS: one pseudo-element of tiled dots, each layer falling a whole number of its tiles
+       per loop so the loop is seamless. Far = small + slow, near = bigger + faster. A mask fades
+       it out over the 130px above --snow-end (the "Originals Games" heading, set by JS) and hides
+       it below. */
+    .phone[data-screen="home"] {
+      isolation: isolate;
+      --snow-end: 340px;
+    }
+    .phone[data-screen="home"]::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.75;
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(var(--snow-end) - 130px), transparent var(--snow-end));
+      mask-image: linear-gradient(to bottom, #000 calc(var(--snow-end) - 130px), transparent var(--snow-end));
+      background-image:
+        radial-gradient(circle 2.4px at 123px 127px, rgba(255, 255, 255, 0.55) 0.5px, transparent),
+        radial-gradient(circle 2.4px at 123px 138px, rgba(255, 255, 255, 0.55) 0.5px, transparent),
+        radial-gradient(circle 2.5px at 158px 56px, rgba(255, 255, 255, 0.6) 0.6px, transparent),
+        radial-gradient(circle 2.5px at 55px 139px, rgba(255, 255, 255, 0.6) 0.6px, transparent),
+        radial-gradient(circle 2.6px at 129px 169px, rgba(255, 255, 255, 0.55) 0.6px, transparent),
+        radial-gradient(circle 2.6px at 165px 55px, rgba(255, 255, 255, 0.55) 0.6px, transparent),
+        radial-gradient(circle 2.9px at 32px 122px, rgba(255, 255, 255, 0.7) 0.8px, transparent),
+        radial-gradient(circle 2.9px at 85px 44px, rgba(255, 255, 255, 0.7) 0.8px, transparent),
+        radial-gradient(circle 3.0px at 54px 29px, rgba(255, 255, 255, 0.65) 0.8px, transparent),
+        radial-gradient(circle 3.0px at 210px 239px, rgba(255, 255, 255, 0.65) 0.8px, transparent),
+        radial-gradient(circle 3.2px at 323px 88px, rgba(255, 255, 255, 0.7) 0.9px, transparent),
+        radial-gradient(circle 3.2px at 327px 15px, rgba(255, 255, 255, 0.7) 0.9px, transparent),
+        radial-gradient(circle 3.5px at 278px 40px, rgba(255, 255, 255, 0.8) 1.0px, transparent),
+        radial-gradient(circle 3.5px at 38px 26px, rgba(255, 255, 255, 0.8) 1.0px, transparent),
+        radial-gradient(circle 3.8px at 105px 131px, rgba(255, 255, 255, 0.75) 1.2px, transparent),
+        radial-gradient(circle 3.8px at 315px 23px, rgba(255, 255, 255, 0.75) 1.2px, transparent),
+        radial-gradient(circle 4.1px at 406px 245px, rgba(255, 255, 255, 0.85) 1.3px, transparent),
+        radial-gradient(circle 4.1px at 175px 233px, rgba(255, 255, 255, 0.85) 1.3px, transparent);
+      background-size: 157px 157px, 157px 157px, 193px 181px, 193px 181px, 229px 211px, 229px 211px, 263px 241px, 263px 241px, 311px 283px, 311px 283px, 347px 331px, 347px 331px, 383px 367px, 383px 367px, 461px 419px, 461px 419px, 509px 487px, 509px 487px;
+      animation: snow-fall 40s linear infinite;
+    }
+    @keyframes snow-fall {
+      from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+      to { background-position: 157px 314px, 157px 314px, -193px 362px, -193px 362px, 229px 422px, 229px 422px, 0px 723px, 0px 723px, -311px 849px, -311px 849px, 347px 993px, 347px 993px, 0px 1468px, 0px 1468px, 0px 1676px, 0px 1676px, 509px 1948px, 509px 1948px; }
+    }
+    .stage.snow-off .phone::before {
+      display: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .phone[data-screen="home"]::before {
+        animation: none;
+      }
+    }
+    .preview-toggle {
+      margin-top: 8px;
+      background: var(--bg-phone);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 7px 13px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -1292,6 +1356,7 @@
       <button onclick="setView('caro-win', this)">7. Win</button>
       <button onclick="setView('caro-lose', this)">8. Lose</button>
     </div>
+    <button type="button" class="preview-toggle" id="snow-toggle" aria-pressed="true" onclick="toggleSnow(this)">❄ Snow: on</button>
     <p class="demo-note">
       <b>Demo app (GSAP)</b> = cùng timing đã port sang Next.js (<code>AppShell</code>, <code>MatchResultOverlay</code>).
     </p>
@@ -1549,7 +1614,7 @@
           <button type="button" class="hdr-back" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
           <div>
             <div class="brand-title">Caro Tournaments</div>
-            <div class="brand-sub">Hi, Olivier · Bo1 &amp; Bo3</div>
+            <div class="brand-sub">Hi, Olivier</div>
           </div>
         </div>
         <button class="btn-pill-sm">＋ CREATE</button>
@@ -2206,6 +2271,23 @@
       matchResultTween
         .to(modal, { opacity: 0, scale: 0.92, y: 16, duration: 0.2, ease: 'power2.in' })
         .to(scrim, { opacity: 0, duration: 0.18, ease: 'power2.in' }, '-=0.06');
+    }
+
+    // Snow ends at the "Originals Games" heading of the Home screen.
+    function placeSnowEnd() {
+      const phone = document.querySelector('.phone[data-screen="home"]')
+      const head = phone && phone.querySelector('.sec-head')
+      if (!head) return
+      const top = head.getBoundingClientRect().top - phone.getBoundingClientRect().top
+      phone.style.setProperty('--snow-end', Math.round(top) + 'px')
+    }
+    window.addEventListener('load', placeSnowEnd)
+    window.addEventListener('resize', placeSnowEnd)
+
+    function toggleSnow(btn) {
+      const off = document.getElementById('stage').classList.toggle('snow-off');
+      btn.textContent = off ? '❄ Snow: off' : '❄ Snow: on';
+      btn.setAttribute('aria-pressed', String(!off));
     }
 
     function setView(mode, btn) {

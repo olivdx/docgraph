@@ -235,3 +235,46 @@ describe('Bo3 in views', () => {
     expect(toMatchView(r, m.id, m.X!, T0 + 2, {})).toMatchObject({ bestOf: 1, gameNo: 1, score: { X: 1, O: 0 } })
   })
 })
+
+describe('free play in views', () => {
+  function freeFinal() {
+    const r = started(2)
+    r.mode = 'free'
+    const m = r.matches[0]
+    m.readyAt = { X: T0, O: T0 }
+    m.status = 'playing'
+    m.startedAt = T0
+    return { r, m }
+  }
+
+  it('waiting for a rematch: no turn, the game just played, who accepted and the time left', () => {
+    const { r, m } = freeFinal()
+    m.games = [
+      { winner: m.X!, endReason: 'five_in_row', finishedAt: T0 + 1 },
+      { winner: m.O!, endReason: 'turn_timeout', finishedAt: T0 + 2 },
+      { winner: m.X!, endReason: 'five_in_row', finishedAt: T0 + 500 },
+    ]
+    m.rematch = { since: T0 + 500, ready: [m.O!] }
+    const v = toMatchView(r, m.id, m.X!, T0 + 1500, {})
+    expect(v).toMatchObject({ mode: 'free', status: 'playing', gameNo: 3, score: { X: 2, O: 1 }, turn: null, turnRemainingMs: null })
+    expect(v.lastGame).toEqual({ winner: 'X', endReason: 'five_in_row' })
+    expect(v.rematch).toEqual({ you: false, opponent: true, remainingMs: 59_000 })
+    expect(toMatchView(r, m.id, m.O!, T0 + 1500, {}).rematch).toMatchObject({ you: true, opponent: false })
+    expect(toMatchView(r, m.id, 'spectator', T0 + 1500, {}).rematch).toMatchObject({ you: false, opponent: false })
+  })
+
+  it('once over, the score is the real game count (no credited games)', () => {
+    const { r, m } = freeFinal()
+    m.games = [{ winner: m.X!, endReason: 'five_in_row', finishedAt: T0 + 1 }]
+    finishMatch(r, m, 'O', 'left', T0 + 2, mulberry(1))
+    const v = toMatchView(r, m.id, m.X!, T0 + 3, {})
+    expect(v).toMatchObject({ mode: 'free', score: { X: 1, O: 0 }, rematch: null, endReason: 'left' })
+    const card = toRoomView(r, 'u0', T0 + 3, INV)
+    expect(card.mode).toBe('free')
+  })
+
+  it('the room list labels a running free room', () => {
+    const { r } = freeFinal()
+    expect(toRoomSummary(r, 'u0').liveLabel).toBe('Free play live')
+  })
+})

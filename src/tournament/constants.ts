@@ -4,6 +4,8 @@ export const DISCONNECT_DETECT_MS = 5_000
 export const NO_SHOW_MS = 60_000
 /** Bo3: how long a finished game's board stays up before the next game starts. */
 export const GAME_BREAK_MS = 3_000
+/** Free play: how long a finished game waits for both players to accept a rematch before the room ends. */
+export const REMATCH_WAIT_MS = 60_000
 export const MIN_HUMANS = 1
 export const MAX_PLAYERS = 32
 export const LOBBY_TTL_MS = 2 * 60 * 60 * 1000

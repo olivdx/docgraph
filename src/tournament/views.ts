@@ -1,8 +1,8 @@
 import { sideToMove } from '@/src/game/rules'
 import type { Cell, Move, Side } from '@/src/game/types'
 import { roundName } from './bracket'
-import { DISCONNECT_DETECT_MS, NO_SHOW_MS, RECONNECT_GRACE_MS } from './constants'
-import { gameNumber, gameWins, isBotId, opposite, sideOf, winsNeeded, type Presence } from './match'
+import { DISCONNECT_DETECT_MS, NO_SHOW_MS, RECONNECT_GRACE_MS, REMATCH_WAIT_MS } from './constants'
+import { gameNumber, gameWins, isBotId, isFreePlay, opposite, sideOf, winsNeeded, type Presence } from './match'
 import { isActive } from './room'
 import {
   RoomError,
@@ -12,7 +12,10 @@ import {
   type Match,
   type MatchStatus,
   type Room,
+  type RoomMode,
   type RoomStatus,
+  type BotLevel,
+  resolveBotLevel,
 } from './types'
 
 export interface Entrant {
@@ -47,7 +50,9 @@ export interface RoomView {
   code: string
   name: string
   status: RoomStatus
+  mode: RoomMode
   bestOf: BestOf
+  botLevel: BotLevel
   isHost: boolean
   players: { name: string; avatarUrl: string | null; isBot: boolean; seed: number | null; isHost: boolean }[]
   slotsIfStartedNow: number
@@ -68,14 +73,17 @@ export interface MatchView {
   you: Side | null
   players: { X: { name: string; isBot: boolean } | null; O: { name: string; isBot: boolean } | null }
   moves: Move[]
+  mode: RoomMode
   bestOf: BestOf
   /** 1-based game number (during a break: the game just finished). */
   gameNo: number
-  /** Games won, by side in the current game (a forfeit credits the winner with the games needed). */
+  /** Games won, by side in the current game (a cup forfeit credits the winner with the games needed). */
   score: { X: number; O: number }
-  /** During a break between games: who won the game just finished, and how. */
+  /** Between games (Bo3 break or free-play rematch wait): who won the game just finished, and how. */
   lastGame: { winner: Side; endReason: EndReason } | null
   nextGameRemainingMs: number | null
+  /** Free play, waiting for a rematch: who has accepted (a spectator is never `you`) and the time left. */
+  rematch: { you: boolean; opponent: boolean; remainingMs: number } | null
   /** null when no one is to move (not playing, or a break between games). */
   turn: Side | null
   turnRemainingMs: number | null
@@ -91,9 +99,13 @@ export interface MatchView {
   serverNow: number
 }
 
-/** Games won by `userId` as shown: once the match is decided, the winner shows at least the games needed. */
-function shownWins(room: Pick<Room, 'bestOf'>, m: Match, userId: string | null): number {
+/**
+ * Games won by `userId` as shown: once a cup match is decided, the winner shows at least the games
+ * needed. Free play always shows the real count.
+ */
+function shownWins(room: Pick<Room, 'bestOf' | 'mode'>, m: Match, userId: string | null): number {
   const wins = gameWins(m, userId)
+  if (isFreePlay(room)) return wins
   const won = m.status === 'finished' && m.winner !== null && m[m.winner] === userId
   return won ? Math.max(wins, winsNeeded(room)) : wins
 }
@@ -110,7 +122,9 @@ function entrant(room: Room, userId: string | null): Entrant | null {
 /** Works on a full Room or a listed one (no moves). */
 export function toRoomSummary(room: ListedRoom, viewerId: string): RoomSummary {
   let liveLabel: string | null = null
-  if (room.status === 'running') {
+  if (room.status === 'running' && isFreePlay(room)) {
+    liveLabel = 'Free play live'
+  } else if (room.status === 'running') {
     const open = room.matches.filter((m) => m.kind === 'normal' && m.status !== 'finished')
     if (open.length > 0) {
       const round = Math.min(...open.map((m) => m.round))
@@ -165,7 +179,9 @@ export function toRoomView(room: Room, viewerId: string, now: number, inviteUrl:
     code: room._id,
     name: room.name,
     status: room.status,
+    mode: room.mode ?? 'cup',
     bestOf: room.bestOf ?? 1,
+    botLevel: resolveBotLevel(room),
     isHost: room.hostId === viewerId,
     players: room.players.map((p) => ({ name: p.name, avatarUrl: p.avatarUrl, isBot: p.isBot, seed: p.seed, isHost: p.userId === room.hostId })),
     slotsIfStartedNow: slots,
@@ -200,7 +216,8 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
 
   const playing = m.status === 'playing'
   const onBreak = playing && m.nextGameAt != null
-  const turn = playing && !onBreak ? sideToMove(m.moves) : null
+  const awaitingRematch = playing && m.rematch != null
+  const turn = playing && !onBreak && !awaitingRematch ? sideToMove(m.moves) : null
   const humanToMove = turn !== null && !isBotId(room, m[turn])
   const turnRemainingMs = turn !== null && humanToMove && m.turnDeadlineAt !== null ? Math.max(0, m.turnDeadlineAt - now) : null
   const pendingRemainingMs = m.status === 'pending' && m.pendingSince !== null ? Math.max(0, m.pendingSince + NO_SHOW_MS - now) : null
@@ -225,11 +242,19 @@ export function toMatchView(room: Room, matchId: string, viewerId: string, now: 
     you,
     players: { X: side(m.X), O: side(m.O) },
     moves: m.moves,
+    mode: room.mode ?? 'cup',
     bestOf: room.bestOf ?? 1,
     gameNo: gameNumber(m),
     score: { X: shownWins(room, m, m.X), O: shownWins(room, m, m.O) },
-    lastGame: onBreak ? lastGameOf(m) : null,
+    lastGame: onBreak || awaitingRematch ? lastGameOf(m) : null,
     nextGameRemainingMs: onBreak ? Math.max(0, m.nextGameAt! - now) : null,
+    rematch: awaitingRematch
+      ? {
+          you: you !== null && m.rematch!.ready.includes(viewerId),
+          opponent: you !== null && m.rematch!.ready.includes(m[opposite(you)] ?? ''),
+          remainingMs: Math.max(0, m.rematch!.since + REMATCH_WAIT_MS - now),
+        }
+      : null,
     turn,
     turnRemainingMs,
     pendingRemainingMs,

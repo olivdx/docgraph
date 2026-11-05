@@ -15,7 +15,33 @@ import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from './types';
  * the blocked-ends rule exact for gapped shapes too. Classifications are memoised per window code.
  */
 
-export type BotOptions = { mode: 'full' | 'fast'; timeBudgetMs?: number; rng?: () => number };
+import type { BotLevel } from '@/src/tournament/types'
+
+export type BotOptions = {
+  mode: 'full' | 'fast'
+  /** Defaults from `level` (duel when omitted). */
+  timeBudgetMs?: number
+  level?: BotLevel
+  rng?: () => number
+}
+
+export interface BotStrength {
+  maxDepth: number
+  timeBudgetMs: number
+  vcf: boolean
+  vct: boolean
+}
+
+export const strengthForLevel = (level: BotLevel): BotStrength => {
+  switch (level) {
+    case 'prelude':
+      return { maxDepth: 2, timeBudgetMs: 80, vcf: false, vct: false }
+    case 'gauntlet':
+      return { maxDepth: 6, timeBudgetMs: 700, vcf: true, vct: true }
+    default:
+      return { maxDepth: 4, timeBudgetMs: 250, vcf: true, vct: false }
+  }
+}
 
 /** ≥ 7 keeps every pattern window (candidate ±5, candidate ≤ 2 from a stone) inside the window. */
 const WINDOW_MARGIN = 8;
@@ -263,9 +289,9 @@ class Engine {
 
 // ---- search --------------------------------------------------------------------------------
 const WIN = 1e12;
-const MAX_DEPTH = 4;
 const BRANCH = 12;
 const VCF_DEPTH = 10;
+const VCT_DEPTH = 8;
 
 class Timeout extends Error {}
 
@@ -347,6 +373,89 @@ function vcf(e: Engine, me: number, depth: number): number {
   return -1;
 }
 
+/** True if playing at (x,y) in window coords gives `me` an open three on any line. */
+function createsOpen3(e: Engine, x: number, y: number, me: number): boolean {
+  const minX = BOARD_MIN - e.x0;
+  const maxX = BOARD_MAX - e.x0;
+  const minY = BOARD_MIN - e.y0;
+  const maxY = BOARD_MAX - e.y0;
+  for (let d = 0; d < 4; d++) {
+    const dx = DIRS[d][0];
+    const dy = DIRS[d][1];
+    let code = 0;
+    for (let i = 0; i < 10; i++) {
+      const k = i < 5 ? i - 5 : i - 4;
+      const xx = x + dx * k;
+      const yy = y + dy * k;
+      let digit: number;
+      if (xx < 0 || yy < 0 || xx >= e.w || yy >= e.h) digit = xx < minX || yy < minY || xx > maxX || yy > maxY ? 2 : 0;
+      else {
+        const v = e.b[yy * e.w + xx];
+        digit = v === EMPTY ? 0 : v === me ? 1 : 2;
+      }
+      code += digit * POW3[i];
+    }
+    if (level(code) === OPEN3) return true;
+  }
+  return false;
+}
+
+/** Cells where `me` creates an open three (not already open four / five). */
+function open3Moves(e: Engine, me: number, g: Gen): number[] {
+  const { b, w } = e;
+  const out: number[] = [];
+  for (const idx of g.cells.slice(0, 2 * BRANCH)) {
+    if (b[idx] !== EMPTY) continue;
+    const x = idx % w;
+    const y = (idx - x) / w;
+    const a = cellScore(e, x, y, me);
+    if (a >= W_OPEN4) continue;
+    if (createsOpen3(e, x, y, me)) out.push(idx);
+  }
+  return out;
+}
+
+function threatSquares(e: Engine, me: number): number[] {
+  const g = e.gen(3 - me);
+  return [...new Set([...g.oppFive, ...g.oppOpen4])];
+}
+
+/**
+ * Victory by continuous threats: fours and open threes until the opponent faces a double threat.
+ * Returns the first move of a winning sequence, or -1.
+ */
+function vct(e: Engine, me: number, depth: number): number {
+  if (e.checkTime && performance.now() > e.deadline) throw new Timeout();
+  const g = e.gen(me);
+  if (g.myFive.length > 0) return g.myFive[0];
+  if (g.oppFive.length > 0) return -1;
+  if (g.myOpen4.length > 0) return g.myOpen4[0];
+  if (depth <= 0) return -1;
+  const tries = byScore([...g.myFour, ...open3Moves(e, me, g)], g.score);
+  for (const idx of tries) {
+    e.place(idx, me);
+    try {
+      const reply = e.gen(3 - me);
+      if (reply.myFive.length > 0) continue;
+      const forced = threatSquares(e, me);
+      if (forced.length >= 2) return idx;
+      if (forced.length === 0) continue;
+      if (forced.length > 3) continue;
+      for (const block of forced) {
+        e.place(block, 3 - me);
+        try {
+          if (vct(e, me, depth - 1) >= 0) return idx;
+        } finally {
+          e.remove(block);
+        }
+      }
+    } finally {
+      e.remove(idx);
+    }
+  }
+  return -1;
+}
+
 function pick(cells: number[], score: Float64Array, rng?: () => number): number {
   const sorted = byScore(cells, score);
   if (!rng) return sorted[0];
@@ -388,43 +497,92 @@ export function chooseBotMove(moves: Move[], side: Side, opts: BotOptions): Cell
     return toCell(pick(g.cells, s, opts.rng));
   }
 
+  const level = opts.level ?? 'duel';
+  const strength = strengthForLevel(level);
+  const budget = opts.timeBudgetMs ?? strength.timeBudgetMs;
+  const start = performance.now();
+  e.checkTime = true;
+
+  const runVcfAttack = () => {
+    e.deadline = start + (strength.vct ? budget * (80 / 700) : budget / 5);
+    return vcf(e, me, VCF_DEPTH);
+  };
+  const runVcfDefense = (root: number[]) => {
+    e.deadline = start + (strength.vct ? budget * (200 / 700) : budget / 2);
+    if (vcf(e, 3 - me, VCF_DEPTH) < 0) return root;
+    const pool = byScore([...root, ...g.myFour, ...g.cells.slice(0, 2 * BRANCH)], s);
+    const safe: number[] = [];
+    for (const idx of pool) {
+      e.place(idx, me);
+      try {
+        if (vcf(e, 3 - me, VCF_DEPTH) < 0) safe.push(idx);
+      } finally {
+        e.remove(idx);
+      }
+    }
+    if (safe.length === 1) return safe;
+    if (safe.length > 0) return safe.slice(0, BRANCH);
+    return root;
+  };
+  const runVctAttack = () => {
+    e.deadline = start + budget * (340 / 700);
+    return vct(e, me, VCT_DEPTH);
+  };
+  const runVctDefense = (root: number[]) => {
+    e.deadline = start + budget * (480 / 700);
+    if (vct(e, 3 - me, VCT_DEPTH) < 0) return root;
+    const pool = byScore([...root, ...g.myFour, ...g.cells.slice(0, 2 * BRANCH)], s);
+    const safe: number[] = [];
+    for (const idx of pool) {
+      e.place(idx, me);
+      try {
+        if (vct(e, 3 - me, VCT_DEPTH) < 0) safe.push(idx);
+      } finally {
+        e.remove(idx);
+      }
+    }
+    if (safe.length === 1) return safe;
+    if (safe.length > 0) return safe.slice(0, BRANCH);
+    return root;
+  };
+
   // Full: iterative-deepening negamax over the root candidates.
   let root = searchMoves(g);
   if (root.length === 1) return toCell(root[0]);
-  const budget = opts.timeBudgetMs ?? 250;
-  const start = performance.now();
-  // A forced win by continuous fours beats any heuristic choice (capped at a fifth of the budget).
-  e.deadline = start + budget / 5;
-  e.checkTime = true;
-  try {
-    const win = vcf(e, me, VCF_DEPTH);
-    if (win >= 0) return toCell(win);
-  } catch (err) {
-    if (!(err instanceof Timeout)) throw err;
-  }
-  // If the opponent would have a VCF on their move, keep only moves that refute it.
-  e.deadline = start + budget / 2;
-  try {
-    if (vcf(e, 3 - me, VCF_DEPTH) >= 0) {
-      const pool = byScore([...root, ...g.myFour, ...g.cells.slice(0, 2 * BRANCH)], s);
-      const safe: number[] = [];
-      for (const idx of pool) {
-        e.place(idx, me);
-        try {
-          if (vcf(e, 3 - me, VCF_DEPTH) < 0) safe.push(idx);
-        } finally {
-          e.remove(idx);
-        }
-      }
-      if (safe.length === 1) return toCell(safe[0]);
-      if (safe.length > 0) root = safe.slice(0, BRANCH);
+
+  if (strength.vcf) {
+    try {
+      const win = runVcfAttack();
+      if (win >= 0) return toCell(win);
+    } catch (err) {
+      if (!(err instanceof Timeout)) throw err;
     }
-  } catch (err) {
-    if (!(err instanceof Timeout)) throw err;
+    try {
+      root = runVcfDefense(root);
+      if (root.length === 1) return toCell(root[0]);
+    } catch (err) {
+      if (!(err instanceof Timeout)) throw err;
+    }
   }
+
+  if (strength.vct) {
+    try {
+      const win = runVctAttack();
+      if (win >= 0) return toCell(win);
+    } catch (err) {
+      if (!(err instanceof Timeout)) throw err;
+    }
+    try {
+      root = runVctDefense(root);
+      if (root.length === 1) return toCell(root[0]);
+    } catch (err) {
+      if (!(err instanceof Timeout)) throw err;
+    }
+  }
+
   e.deadline = start + budget;
   let bestMove = root[0];
-  for (let depth = 1; depth <= MAX_DEPTH; depth++) {
+  for (let depth = 1; depth <= strength.maxDepth; depth++) {
     e.checkTime = depth > 1;
     let alpha = -Infinity;
     let depthBest = root[0];

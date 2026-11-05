@@ -8,7 +8,7 @@ import { roomPath } from '@/src/client/routes'
 import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import { caroRoomChannel } from '@/src/realtime/channels'
-import type { BestOf } from '@/src/tournament/types'
+import type { BotLevel, MatchFormat } from '@/src/tournament/types'
 import type { BracketMatchView, Entrant, RoomView } from '@/src/tournament/views'
 
 const AVATAR_COLORS = ['#6c79ff', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4']
@@ -59,6 +59,7 @@ function Room() {
   const [toast, setToast] = useState<string | null>(null)
   const joinTried = useRef(false)
   const formatSeq = useRef(0)
+  const botLevelSeq = useRef(0)
 
   // Prefer whichever is fresher: the last poll or the last action response.
   const view = override && (!room || override.serverNow > room.serverNow) ? override : room
@@ -139,20 +140,49 @@ function Room() {
   )
 
   const setFormat = useCallback(
-    async (bestOf: BestOf) => {
-      if (view?.bestOf === bestOf) return
+    async (format: MatchFormat) => {
+      if (!view || formatOf(view) === format) return
       const base = view
-      if (!base) return
       const my = ++formatSeq.current
       const revert = base
-      setOverride({ ...base, bestOf, serverNow: Math.max(base.serverNow, Date.now()) + 1 })
+      setOverride({
+        ...base,
+        mode: format === 'free' ? 'free' : 'cup',
+        bestOf: format === 'bo3' ? 3 : 1,
+        serverNow: Math.max(base.serverNow, Date.now()) + 1,
+      })
       try {
-        const r = await apiPost<RoomView>(`/api/rooms/${code}/format`, { bestOf })
+        const r = await apiPost<RoomView>(`/api/rooms/${code}/format`, { format })
         if (my !== formatSeq.current) return
         setOverride(r)
-      } catch {
+      } catch (e) {
         if (my !== formatSeq.current) return
-        setToast('Could not change the format. Try again.')
+        setToast(
+          e instanceof ApiError && e.code === 'too_many_players'
+            ? 'Free play is for 2 players. Someone has to leave first.'
+            : 'Could not change the format. Try again.',
+        )
+        setOverride({ ...revert, serverNow: Math.max(revert.serverNow, Date.now()) + 1 })
+        refresh()
+      }
+    },
+    [view, code, refresh],
+  )
+
+  const setBotLevel = useCallback(
+    async (level: BotLevel) => {
+      if (!view || view.botLevel === level) return
+      const base = view
+      const my = ++botLevelSeq.current
+      const revert = base
+      setOverride({ ...base, botLevel: level, serverNow: Math.max(base.serverNow, Date.now()) + 1 })
+      try {
+        const r = await apiPost<RoomView>(`/api/rooms/${code}/bot-level`, { level })
+        if (my !== botLevelSeq.current) return
+        setOverride(r)
+      } catch {
+        if (my !== botLevelSeq.current) return
+        setToast('Could not change bot difficulty. Try again.')
         setOverride({ ...revert, serverNow: Math.max(revert.serverNow, Date.now()) + 1 })
         refresh()
       }
@@ -234,9 +264,20 @@ function Room() {
         </div>
       )}
 
-      {view.status === 'lobby' && <Lobby view={view} readOnly={blockedBy !== null} onFormat={setFormat} />}
-      {view.status === 'running' && <Bracket view={view} onEnter={enter} />}
-      {view.status === 'finished' && (
+      {view.status === 'lobby' && (
+        <Lobby view={view} readOnly={blockedBy !== null} onFormat={setFormat} onBotLevel={setBotLevel} />
+      )}
+      {view.status === 'running' && view.mode === 'free' && <FreePlayCard view={view} onEnter={enter} />}
+      {view.status === 'running' && view.mode !== 'free' && <Bracket view={view} onEnter={enter} />}
+      {view.status === 'finished' && view.mode === 'free' && (
+        <>
+          <FreePlayCard view={view} onEnter={enter} />
+          <button onClick={() => router.push('/caro')} className={GHOST}>
+            Back to rooms
+          </button>
+        </>
+      )}
+      {view.status === 'finished' && view.mode !== 'free' && (
         <>
           <div className={`${CARD} text-center`}>
             <div className="text-[13px] text-muted">Tournament over</div>
@@ -278,16 +319,55 @@ function Room() {
   )
 }
 
+const formatOf = (v: Pick<RoomView, 'mode' | 'bestOf'>): MatchFormat =>
+  v.mode === 'free' ? 'free' : v.bestOf === 3 ? 'bo3' : 'bo1'
+const FORMAT_PILL: Record<MatchFormat, string> = { bo1: 'BO1', bo3: 'BO3', free: 'FREE PLAY' }
+const BOT_LEVEL_PILL: Record<BotLevel, string> = { prelude: 'PRELUDE', duel: 'DUEL', gauntlet: 'GAUNTLET' }
+
+/** Free play has no bracket: its one match, the running score, and a way in. */
+function FreePlayCard({ view, onEnter }: { view: RoomView; onEnter: (id: string) => void }) {
+  const m = view.rounds[0]?.matches[0]
+  if (!m) return null
+  const over = view.status === 'finished'
+  const name = (e: typeof m.a) => (e ? `${e.isBot ? '🤖 ' : ''}${e.name}` : '?')
+  return (
+    <div className={`${CARD} text-center`}>
+      <div className="flex items-center justify-between">
+        <span className="font-display text-base text-white">{over ? 'Free play over' : 'Free play'}</span>
+        <span className="lime-pill">{over ? 'FINAL SCORE' : '● LIVE'}</span>
+      </div>
+      <div className="my-3 flex items-center justify-center gap-3 font-display text-white">
+        <span className={`min-w-0 flex-1 truncate text-right ${m.winner === 'a' ? 'text-lime' : ''}`}>{name(m.a)}</span>
+        <span className="flex-none rounded-lg bg-panel2 px-3 py-1 text-xl tabular-nums">
+          {m.scoreA ?? 0} – {m.scoreB ?? 0}
+        </span>
+        <span className={`min-w-0 flex-1 truncate text-left ${m.winner === 'b' ? 'text-lime' : ''}`}>{name(m.b)}</span>
+      </div>
+      {over ? (
+        <div className="text-xs text-muted">This room closes in 10 minutes.</div>
+      ) : (
+        <button onClick={() => onEnter(m.id)} className={PRIMARY}>
+          {m.isYours ? 'Back to the board →' : 'Watch →'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function Lobby({
   view,
   readOnly,
   onFormat,
+  onBotLevel,
 }: {
   view: RoomView
   readOnly: boolean
-  onFormat: (bestOf: BestOf) => void
+  onFormat: (format: MatchFormat) => void
+  onBotLevel: (level: BotLevel) => void
 }) {
   const humans = view.players.filter((p) => !p.isBot).length
+  const current = formatOf(view)
+  const botLevel = view.botLevel
   return (
     <>
       <div className="relative overflow-hidden rounded-[22px] border border-[#8b95ff]/25 bg-gradient-to-br from-[#272d52] via-[#1b2038] to-[#171b2d] p-4 text-center shadow-lg">
@@ -306,22 +386,24 @@ function Lobby({
       <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="font-display text-base text-white">Match Format</span>
-          <span className="lime-pill">{view.isHost && !readOnly ? 'HOST CONTROLS' : `BO${view.bestOf}`}</span>
+          <span className="lime-pill">{view.isHost && !readOnly ? 'HOST CONTROLS' : FORMAT_PILL[current]}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2.5" role="group" aria-label="Match format">
+        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Match format">
           {(
             [
-              [1, 'BEST OF 1', 'One game blitz', '⚡'],
-              [3, 'BEST OF 3', 'First to 2 wins', '👑'],
+              ['bo1', 'BEST OF 1', 'One game blitz', '⚡'],
+              ['bo3', 'BEST OF 3', 'First to 2 wins', '👑'],
+              ['free', 'FREE PLAY', '1 vs 1, rematch', '🔁'],
             ] as const
           ).map(([n, title, desc, icon]) => {
-            const active = view.bestOf === n
-            const canPick = view.isHost && !readOnly
+            const active = current === n
+            // Free play holds 2 players at most (a lone host plays a bot).
+            const canPick = view.isHost && !readOnly && !(n === 'free' && view.players.length > 2)
             return (
               <div
                 key={n}
                 onClick={() => canPick && onFormat(n)}
-                className={`flex flex-col items-center gap-1.5 rounded-[18px] border bg-gradient-to-b from-panel2 to-panel p-3.5 text-center transition ${
+                className={`flex flex-col items-center gap-1.5 rounded-[18px] border bg-gradient-to-b from-panel2 to-panel px-2 py-3 text-center transition ${
                   active ? 'border-accent shadow-[inset_0_0_24px_rgba(108,121,255,0.16)]' : 'border-line'
                 } ${canPick ? 'cursor-pointer' : ''}`}
               >
@@ -340,7 +422,53 @@ function Lobby({
                     active ? 'arcade-glow bg-accent text-white' : 'border border-line bg-bg text-muted'
                   }`}
                 >
-                  {active ? `ACTIVE · BO${n}` : `SELECT BO${n}`}
+                  {active ? 'ACTIVE' : 'SELECT'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-display text-base text-white">Bot Difficulty</span>
+          <span className="lime-pill">{view.isHost && !readOnly ? 'HOST CONTROLS' : BOT_LEVEL_PILL[botLevel]}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Bot difficulty">
+          {(
+            [
+              ['prelude', 'PRELUDE', 'A couple of moves ahead', '🌱'],
+              ['duel', 'DUEL', 'A serious game', '⚔️'],
+              ['gauntlet', 'GAUNTLET', 'The real challenge', '🔥'],
+            ] as const
+          ).map(([n, title, desc, icon]) => {
+            const active = botLevel === n
+            const canPick = view.isHost && !readOnly
+            return (
+              <div
+                key={n}
+                onClick={() => canPick && onBotLevel(n)}
+                className={`flex flex-col items-center gap-1.5 rounded-[18px] border bg-gradient-to-b from-panel2 to-panel px-2 py-3 text-center transition ${
+                  active ? 'border-accent shadow-[inset_0_0_24px_rgba(108,121,255,0.16)]' : 'border-line'
+                } ${canPick ? 'cursor-pointer' : ''}`}
+              >
+                <div className="font-display text-sm leading-tight text-white uppercase">{title}</div>
+                <div className="text-[11px] text-muted">{desc}</div>
+                <div className="my-0.5 text-3xl drop-shadow">{icon}</div>
+                <button
+                  type="button"
+                  disabled={!canPick}
+                  aria-pressed={active}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (canPick) onBotLevel(n)
+                  }}
+                  className={`w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
+                    active ? 'arcade-glow bg-accent text-white' : 'border border-line bg-bg text-muted'
+                  }`}
+                >
+                  {active ? 'ACTIVE' : 'SELECT'}
                 </button>
               </div>
             )
@@ -365,7 +493,15 @@ function Lobby({
           </div>
         ))}
         <div className="mt-2.5 text-xs text-muted">
-          {humans === 1 ? (
+          {current === 'free' ? (
+            humans === 1 ? (
+              <>
+                Free play: you vs <b className="font-display text-[#a78bfa]">1 bot</b>, rematch after every game.
+              </>
+            ) : (
+              <>Free play: 1 vs 1, rematch after every game. Max 2 players.</>
+            )
+          ) : humans === 1 ? (
             <>
               Solo start: you vs <b className="font-display text-[#a78bfa]">1 bot</b> — jumps straight into the Final.
             </>

@@ -34,7 +34,7 @@ describe('realtime notifications', () => {
     expect(sent).toEqual([]) // insert, not an update: nobody can be subscribed yet
     await svc.join(code, tg(2))
     expect(sent.pop()).toEqual({ channels: [`caro:${code}`], version: 1 })
-    await svc.setFormat(code, tg(1), 3)
+    await svc.setFormat(code, tg(1), 'bo3')
     expect(sent.pop()).toEqual({ channels: [`caro:${code}`], version: 2 })
     expect((await svc.getRoom(code, tg(2))).bestOf).toBe(3)
     await svc.start(code, tg(1))

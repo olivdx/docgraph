@@ -3,8 +3,20 @@ import type { Cell } from '@/src/game/types'
 import { planBracket } from './bracket'
 import { randomCode } from './codes'
 import { FINISHED_TTL_MS, LOBBY_TTL_MS, MATCH_ID_LEN, MAX_PLAYERS, MIN_HUMANS } from './constants'
-import { applyMove, finishMatch, opposite, promoteIfReady, stepMatch, type Presence, type SettleOpts } from './match'
-import { RoomError, type BestOf, type ListedRoom, type Match, type Player, type Room } from './types'
+import {
+  acceptRematchInPlace,
+  applyMove,
+  endFreePlay,
+  finishMatch,
+  isFreePlay,
+  opposite,
+  promoteIfReady,
+  resignGame,
+  stepMatch,
+  type Presence,
+  type SettleOpts,
+} from './match'
+import { RoomError, type BotLevel, type ListedRoom, type Match, type MatchFormat, type Player, type Room } from './types'
 
 /**
  * Room aggregate. Every exported function is pure: it never mutates its input and returns a new
@@ -36,7 +48,9 @@ export function createRoom(p: { code: string; host: UserInfo; name?: string; now
     name,
     hostId: p.host.userId,
     status: 'lobby',
+    mode: 'cup',
     bestOf: 1,
+    botLevel: 'duel',
     players: [human(p.host, p.now)],
     totalRounds: 0,
     matches: [],
@@ -53,7 +67,7 @@ export function joinRoom(room: Room, user: UserInfo, now: number): Room {
   const r = structuredClone(room)
   if (r.players.some((p) => p.userId === user.userId)) return r
   if (r.status !== 'lobby') throw new RoomError('not_lobby')
-  if (r.players.length >= MAX_PLAYERS) throw new RoomError('full')
+  if (r.players.length >= (r.mode === 'free' ? 2 : MAX_PLAYERS)) throw new RoomError('full')
   r.players.push(human(user, now))
   return r
 }
@@ -66,12 +80,26 @@ export function leaveRoom(room: Room, userId: string): Room {
   return r
 }
 
-/** Host only, lobby only: the match format for every match of the tournament. */
-export function setBestOf(room: Room, userId: string, bestOf: BestOf): Room {
+/**
+ * Host only, lobby only. `bo1`/`bo3`: a knockout cup with that format for every match. `free`:
+ * one 1-vs-1 match (a bot fills in for a lone host) with rematches, so at most 2 players.
+ */
+export function setFormat(room: Room, userId: string, format: MatchFormat): Room {
+  if (userId !== room.hostId) throw new RoomError('not_host')
+  if (room.status !== 'lobby') throw new RoomError('not_lobby')
+  if (format === 'free' && room.players.length > 2) throw new RoomError('too_many_players')
+  const r = structuredClone(room)
+  r.mode = format === 'free' ? 'free' : 'cup'
+  r.bestOf = format === 'bo3' ? 3 : 1
+  return r
+}
+
+/** Host only, lobby only. */
+export function setBotLevel(room: Room, userId: string, level: BotLevel): Room {
   if (userId !== room.hostId) throw new RoomError('not_host')
   if (room.status !== 'lobby') throw new RoomError('not_lobby')
   const r = structuredClone(room)
-  r.bestOf = bestOf
+  r.botLevel = level
   return r
 }
 
@@ -102,6 +130,7 @@ function emptyMatch(id: string, round: number, slot: number, kind: Match['kind']
     moves: [],
     games: [],
     nextGameAt: null,
+    rematch: null,
     turnDeadlineAt: null,
     botMoveDueAt: null,
     winner: null,
@@ -256,7 +285,7 @@ export function playMove(
     if (m.status === 'finished' && wasPlaying(room, matchId)) return r
     throw new RoomError('not_playing')
   }
-  if (m.nextGameAt !== null) throw new RoomError('not_playing') // break between games
+  if (m.nextGameAt !== null || m.rematch) throw new RoomError('not_playing') // between games
   if (!side || sideToMove(m.moves) !== side) throw new RoomError('not_your_turn')
   if (!isInside(cell.x, cell.y)) throw new RoomError('out_of_bounds')
   if (m.moves.some((mv) => mv.x === cell.x && mv.y === cell.y)) throw new RoomError('occupied')
@@ -282,18 +311,68 @@ export function resign(
     if (m.status === 'finished' && wasPlaying(room, matchId)) return r
     throw new RoomError('not_playing')
   }
-  const side = m.X === userId ? 'X' : 'O'
-  finishMatch(r, m, opposite(side), 'resign', now, rng)
+  if (isFreePlay(r)) {
+    // Free play: resign gives up the current game only (nothing to resign while waiting for a rematch).
+    if (m.rematch) throw new RoomError('not_playing')
+    resignGame(r, m, userId, now, rng)
+  } else {
+    const side = m.X === userId ? 'X' : 'O'
+    finishMatch(r, m, opposite(side), 'resign', now, rng)
+  }
+  settleInPlace(r, presence ?? null, now, rng, opts)
+  return r
+}
+
+/** Free play: accept a rematch after a game (idempotent; a no-op once the next game started). */
+export function acceptRematch(
+  room: Room,
+  matchId: string,
+  userId: string,
+  now: number,
+  rng: Rng,
+  presence?: Record<string, number>,
+  opts?: SettleOpts,
+): Room {
+  const r = structuredClone(room)
+  settleInPlace(r, presence ?? null, now, rng, opts)
+  const m = loadMatch(r, matchId, userId)
+  if (!isFreePlay(r) || m.status === 'waiting' || m.status === 'pending') throw new RoomError('not_playing')
+  if (m.status === 'finished') return r // the room already ended: report it
+  acceptRematchInPlace(r, m, userId, now, rng)
+  settleInPlace(r, presence ?? null, now, rng, opts)
+  return r
+}
+
+/** Free play: leave, which ends the room (see endFreePlay for who wins). */
+export function leaveMatch(
+  room: Room,
+  matchId: string,
+  userId: string,
+  now: number,
+  rng: Rng,
+  presence?: Record<string, number>,
+  opts?: SettleOpts,
+): Room {
+  const r = structuredClone(room)
+  settleInPlace(r, presence ?? null, now, rng, opts)
+  const m = loadMatch(r, matchId, userId)
+  if (!isFreePlay(r)) throw new RoomError('not_playing')
+  if (m.status === 'finished') return r
+  const stayer = m.a === userId ? m.b : m.a
+  if (m.status === 'playing') endFreePlay(r, m, stayer, 'left', now, rng)
+  else finishMatch(r, m, m.X === userId ? 'O' : 'X', 'left', now, rng) // left before it started
   settleInPlace(r, presence ?? null, now, rng, opts)
   return r
 }
 
 /** Fills fields added after a room may have been stored (Bo3): such rooms read as Bo1. Mutates and returns `room`. */
 export function normalizeRoom(room: Room): Room {
+  room.mode ??= 'cup'
   room.bestOf ??= 1
   for (const m of room.matches) {
     m.games ??= []
     m.nextGameAt ??= null
+    m.rematch ??= null
   }
   return room
 }

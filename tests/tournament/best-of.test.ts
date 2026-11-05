@@ -6,7 +6,7 @@ import {
   normalizeRoom,
   playMove,
   resign,
-  setBestOf,
+  setFormat,
   settleRoom,
   startRoom,
 } from '@/src/tournament/room'
@@ -26,7 +26,7 @@ function lobby(humans: number): Room {
 }
 
 function started(humans: number, bestOf: 1 | 3, seed = 1): Room {
-  return startRoom(setBestOf(lobby(humans), 'u0', bestOf), 'u0', START, mulberry(seed))
+  return startRoom(setFormat(lobby(humans), 'u0', bestOf === 3 ? 'bo3' : 'bo1'), 'u0', START, mulberry(seed))
 }
 
 const isBot = (r: Room, id: string | null) => r.players.find((p) => p.userId === id)?.isBot ?? false
@@ -82,10 +82,10 @@ describe('format choice', () => {
   it('defaults to Bo1; the host can switch it in the lobby only', () => {
     const l = lobby(2)
     expect(l.bestOf).toBe(1)
-    expect(setBestOf(l, 'u0', 3).bestOf).toBe(3)
+    expect(setFormat(l, 'u0', 'bo3').bestOf).toBe(3)
     expect(l.bestOf).toBe(1) // pure
-    expect(code(() => setBestOf(l, 'u1', 3))).toBe('not_host')
-    expect(code(() => setBestOf(started(2, 1), 'u0', 3))).toBe('not_lobby')
+    expect(code(() => setFormat(l, 'u1', 'bo3'))).toBe('not_host')
+    expect(code(() => setFormat(started(2, 1), 'u0', 'bo3'))).toBe('not_lobby')
   })
 })
 

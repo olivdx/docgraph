@@ -146,7 +146,7 @@ export default function CaroHome() {
             <div className="font-display text-xl leading-tight text-white">Caro Tournaments</div>
             {firstName && (
               <div className="text-xs text-muted">
-                Hi, <b className="text-white">{firstName}</b> · Bo1 &amp; Bo3 Knockout
+                Hi, <b className="text-white">{firstName}</b>
               </div>
             )}
           </div>

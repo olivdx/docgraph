@@ -7,7 +7,7 @@ import { MongoPresenceStore, MongoRoomStore } from './stores'
 import { SudokuService } from './sudoku-service'
 import { MongoSudokuStore } from './sudoku-store'
 import { isDifficulty, type Difficulty } from '@/src/sudoku/types'
-import { isBestOf, RoomError, type BestOf } from '@/src/tournament/types'
+import { isBotLevel, isMatchFormat, RoomError, type BotLevel, type MatchFormat } from '@/src/tournament/types'
 
 /** `https://t.me/<bot>/<app>?startapp=<code>`, or '' when the bot username or app short name is not configured. */
 export function buildInviteUrl(code: string, env: Partial<Record<string, string>> = process.env): string {
@@ -79,6 +79,7 @@ const STATUS: Record<string, number> = {
   already_active: 409,
   not_lobby: 409,
   full: 409,
+  too_many_players: 409,
 }
 
 export function errorResponse(e: unknown): Response {
@@ -105,9 +106,14 @@ export function parseMoveBody(json: unknown): { x: number; y: number; clientMove
   return { x: x as number, y: y as number, clientMoveNo: clientMoveNo as number }
 }
 
-export function parseFormatBody(json: unknown): BestOf {
-  if (!isObject(json) || !isBestOf(json.bestOf)) throw badRequest()
-  return json.bestOf
+export function parseFormatBody(json: unknown): MatchFormat {
+  if (!isObject(json) || !isMatchFormat(json.format)) throw badRequest()
+  return json.format
+}
+
+export function parseBotLevelBody(json: unknown): BotLevel {
+  if (!isObject(json) || !isBotLevel(json.level)) throw badRequest()
+  return json.level
 }
 
 export function parseCreateBody(json: unknown): string | undefined {

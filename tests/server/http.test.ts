@@ -76,11 +76,18 @@ describe('buildInviteUrl', () => {
 })
 
 describe('parseFormatBody', () => {
-  it('accepts 1 or 3 only', () => {
-    expect(parseFormatBody({ bestOf: 1 })).toBe(1)
-    expect(parseFormatBody({ bestOf: 3 })).toBe(3)
-    for (const bad of [{ bestOf: 2 }, { bestOf: '3' }, {}, null, undefined]) {
+  it('accepts bo1, bo3 or free only', () => {
+    expect(parseFormatBody({ format: 'bo1' })).toBe('bo1')
+    expect(parseFormatBody({ format: 'bo3' })).toBe('bo3')
+    expect(parseFormatBody({ format: 'free' })).toBe('free')
+    for (const bad of [{ format: 'bo2' }, { bestOf: 3 }, {}, null, undefined]) {
       expect(() => parseFormatBody(bad)).toThrow()
     }
+  })
+})
+
+describe('errorResponse: free play', () => {
+  it('too_many_players -> 409', () => {
+    expect(errorResponse(new RoomError('too_many_players')).status).toBe(409)
   })
 })
