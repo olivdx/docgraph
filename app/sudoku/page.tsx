@@ -139,7 +139,7 @@ export default function SudokuHome() {
               onClick={() => router.push(`/sudoku/solo?new=${difficulty}`)}
               className="arcade-glow mt-3 block w-full rounded-xl bg-accent p-3 font-display text-sm tracking-wider text-white uppercase"
             >
-              START SOLO GAME ▶
+              START SOLO GAME
             </button>
           </>
         )}
