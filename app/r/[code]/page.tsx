@@ -408,7 +408,8 @@ function Lobby({
                 } ${canPick ? 'cursor-pointer' : ''}`}
               >
                 <div className="font-display text-sm leading-tight text-white uppercase">{title}</div>
-                <div className="text-[11px] text-muted">{desc}</div>
+                {/* Always two lines tall, so icons and buttons line up whatever the text length. */}
+                <div className="flex min-h-[2.5em] items-center text-[11px] leading-tight text-muted">{desc}</div>
                 <div className="my-0.5 text-3xl drop-shadow">{icon}</div>
                 <button
                   type="button"
@@ -418,7 +419,7 @@ function Lobby({
                     e.stopPropagation()
                     if (canPick) onFormat(n)
                   }}
-                  className={`w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
+                  className={`mt-auto w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
                     active ? 'arcade-glow bg-accent text-white' : 'border border-line bg-bg text-muted'
                   }`}
                 >
@@ -454,7 +455,8 @@ function Lobby({
                 } ${canPick ? 'cursor-pointer' : ''}`}
               >
                 <div className="font-display text-sm leading-tight text-white uppercase">{title}</div>
-                <div className="text-[11px] text-muted">{desc}</div>
+                {/* Always two lines tall, so icons and buttons line up whatever the text length. */}
+                <div className="flex min-h-[2.5em] items-center text-[11px] leading-tight text-muted">{desc}</div>
                 <div className="my-0.5 text-3xl drop-shadow">{icon}</div>
                 <button
                   type="button"
@@ -464,7 +466,7 @@ function Lobby({
                     e.stopPropagation()
                     if (canPick) onBotLevel(n)
                   }}
-                  className={`w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
+                  className={`mt-auto w-full rounded-[10px] py-2 font-display text-xs tracking-wider uppercase transition ${
                     active ? 'arcade-glow bg-accent text-white' : 'border border-line bg-bg text-muted'
                   }`}
                 >

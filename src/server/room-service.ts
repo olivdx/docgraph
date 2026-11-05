@@ -17,7 +17,7 @@ import {
   settleRoom,
   startRoom,
 } from '@/src/tournament/room'
-import { isMatchFormat, RoomError, type BotLevel, type MatchFormat, type Room } from '@/src/tournament/types'
+import { RoomError, type BotLevel, type MatchFormat, type Room } from '@/src/tournament/types'
 import {
   toMatchView,
   toRoomSummary,

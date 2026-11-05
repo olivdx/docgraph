@@ -45,7 +45,8 @@ describe('bot level', () => {
   it('strength presets match the lobby labels', () => {
     expect(strengthForLevel('prelude')).toMatchObject({ maxDepth: 2, vcf: false, vct: false })
     expect(strengthForLevel('duel')).toMatchObject({ maxDepth: 4, vcf: true, vct: false })
-    expect(strengthForLevel('gauntlet')).toMatchObject({ maxDepth: 6, vcf: true, vct: true })
+    // Gauntlet runs its own engine (bot-gauntlet.ts), which deepens until its 2 s budget runs out.
+    expect(strengthForLevel('gauntlet')).toMatchObject({ timeBudgetMs: 2000, vcf: true, vct: true })
   })
 
   it('prelude full move finishes under 150ms on a quiet midgame', () => {
