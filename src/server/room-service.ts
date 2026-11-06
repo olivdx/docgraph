@@ -1,3 +1,4 @@
+import type { GauntletHints } from '@/src/game/gauntlet-learn'
 import type { Cell } from '@/src/game/types'
 import { randomCode } from '@/src/tournament/codes'
 import { LOBBY_TTL_MS, ROOM_CODE_LEN } from '@/src/tournament/constants'
@@ -28,6 +29,7 @@ import {
 } from '@/src/tournament/views'
 import { caroMatchChannel, caroRoomChannel, type MoveSignal } from '@/src/realtime/channels'
 import { gameNumber, isBotId } from '@/src/tournament/match'
+import type { GauntletLearning } from './gauntlet-learning'
 import type { PresenceStore, RoomStore } from './stores'
 import type { TelegramUser } from './telegram-auth'
 
@@ -43,6 +45,10 @@ export interface RoomServiceDeps {
   notify?: (channels: string[], version: number) => void
   /** Called with a validated human move just before it is written (see MoveSignal). */
   notifyMove?: (channel: string, signal: MoveSignal) => void
+  /** Gauntlet learning: prefetch hints, learn after writes. Omit → no learning. */
+  learning?: GauntletLearning
+  /** Runs after each successful persist (room changed); used for async learning. */
+  afterWrite?: (before: Room, after: Room, now: number) => void
 }
 
 const MAX_ATTEMPTS = 5
@@ -267,6 +273,19 @@ export class RoomService {
     return this.deps.presence.get(room._id, [...ids])
   }
 
+  /** Learned hints for the caller's match when its Gauntlet bot is due to move; never throws. */
+  private async hintsFor(room: Room, matchId: string): Promise<GauntletHints | undefined> {
+    if (!this.deps.learning) return undefined
+    const m = room.matches.find((x) => x.id === matchId)
+    if (!m) return undefined
+    try {
+      return await this.deps.learning.hintsFor(room, m)
+    } catch (e) {
+      console.warn('[gauntlet-learn] hintsFor failed', e)
+      return undefined
+    }
+  }
+
   /**
    * get → (touch caller) → read presence → command (settling as it needs) → write only if changed
    * (CAS on version); retried from a fresh read on CAS failure, up to MAX_ATTEMPTS. If the command
@@ -291,7 +310,8 @@ export class RoomService {
         touched = true
       }
       const presence = await this.readPresence(loaded, caller?.matchId)
-      const opts = { fullBotMatchId: caller?.matchId ?? null }
+      const hints = caller && this.deps.learning ? await this.hintsFor(loaded, caller.matchId) : undefined
+      const opts = { fullBotMatchId: caller?.matchId ?? null, hints }
       let cached: { room: Room; changed: boolean } | null = null
       const settle = () => (cached ??= settleRoom(loaded, presence, now, this.deps.rng, opts))
       let next: Room
@@ -304,6 +324,7 @@ export class RoomService {
         const written = await this.write(settled.room, loaded.version, now)
         if (written) {
           this.notifyChanged(loaded, written)
+          this.deps.afterWrite?.(loaded, written, now)
           throw e
         }
         continue // CAS lost: re-read and retry
@@ -316,6 +337,7 @@ export class RoomService {
       const saved = await this.write(next, loaded.version, now)
       if (saved) {
         this.notifyChanged(loaded, saved)
+        this.deps.afterWrite?.(loaded, saved, now)
         return { room: saved, presence, now }
       }
     }

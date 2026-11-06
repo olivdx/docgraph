@@ -3,6 +3,8 @@ import { publishChanged, publishMove, realtimeEnabled } from './realtime'
 import type { MoveSignal } from '@/src/realtime/channels'
 import { RoomService } from './room-service'
 import { getDb } from './db'
+import { createGauntletLearning } from './gauntlet-learning'
+import { MongoGauntletBookStore } from './gauntlet-book-store'
 import { MongoPresenceStore, MongoRoomStore } from './stores'
 import { SudokuService } from './sudoku-service'
 import { MongoSudokuStore } from './sudoku-store'
@@ -41,6 +43,7 @@ function getServices(): Promise<Services> {
   servicesPromise ??= getDb()
     .then((db) => {
       const out = {} as Services
+      const learning = createGauntletLearning(new MongoGauntletBookStore(db))
       out.caro = new RoomService({
         rooms: new MongoRoomStore(db),
         presence: new MongoPresenceStore(db),
@@ -50,6 +53,9 @@ function getServices(): Promise<Services> {
         activeElsewhere: (userId) => out.sudoku.activeCode(userId),
         notify,
         notifyMove,
+        learning,
+        afterWrite: (beforeRoom, afterRoom, now) =>
+          after(() => learning.learnFromWrite(beforeRoom, afterRoom, now)),
       })
       out.sudoku = new SudokuService({
         rooms: new MongoSudokuStore(db),

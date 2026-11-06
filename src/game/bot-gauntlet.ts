@@ -1,5 +1,6 @@
 import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from './types'
 import { FIVE, FOUR, LEVEL_WEIGHT, level, OPEN3, OPEN4, POW3, W_DOUBLE3, W_FIVE, W_OPEN4 } from './patterns'
+import { filterByHints, hintBonus, type GauntletHints } from './gauntlet-learn'
 
 /**
  * Gauntlet: the hardest Caro bot. Same rules as the other levels (5+ in a row wins unless both
@@ -23,6 +24,7 @@ import { FIVE, FOUR, LEVEL_WEIGHT, level, OPEN3, OPEN4, POW3, W_DOUBLE3, W_FIVE,
 export type GauntletOptions = {
   timeBudgetMs: number
   rng?: () => number
+  hints?: GauntletHints
 }
 
 // ---- board geometry ----------------------------------------------------------------------------
@@ -651,6 +653,14 @@ const VCF_DEPTH = 14
 const VCT_DEPTHS = [2, 4, 6, 8, 10, 12]
 const DEFENSE_VCT_MAX = 10
 
+/** True when the side to move must act at once: it can make five, must stop a five, or has an open four. */
+export function isForcedPosition(moves: Move[], side: Side): boolean {
+  const e = new GauntletEngine(moves)
+  const me = side === 'X' ? 1 : 2
+  const opp = 3 - me
+  return e.n5[me] > 0 || e.n5[opp] > 0 || e.n4o[me] > 0
+}
+
 /** Chooses the Gauntlet bot's move. Stays within `timeBudgetMs` (plus one node's worth). */
 export function chooseGauntletMove(moves: Move[], side: Side, opts: GauntletOptions): Cell {
   const book = bookMove(moves, side, opts.rng)
@@ -729,12 +739,27 @@ export function chooseGauntletMove(moves: Move[], side: Side, opts: GauntletOpti
     if (root.length === 1) return toCell(root[0])
   }
 
+  const hints = opts.hints
+  if (hints && hints.size > 0) {
+    root = filterByHints(
+      root.map((q) => toCell(q)),
+      hints,
+    ).map((cell) => toIdx(cell.x, cell.y))
+    if (root.length === 1) return toCell(root[0])
+    const weight = (q: number) => hints.get(`${toCell(q).x},${toCell(q).y}`)?.w ?? 0
+    root = root
+      .map((q, i) => ({ q, i }))
+      .sort((a, b) => weight(b.q) - weight(a.q) || a.i - b.i)
+      .map((entry) => entry.q)
+  }
+
   // 3. Iterative-deepening PVS for the rest of the budget (a timed-out iteration still informs the choice).
   e.deadline = start + budget * 0.97
   e.killers.fill(-1)
   let bestMove = root[0]
   for (let depth = 1; depth <= 20; depth++) {
     let alpha = -Infinity
+    let bestScore = -Infinity
     let iterBest = -1
     let firstValue = -Infinity
     let completed = false
@@ -753,8 +778,12 @@ export function chooseGauntletMove(moves: Move[], side: Side, opts: GauntletOpti
           e.unplace(q, me)
         }
         if (i === 0) firstValue = v
+        const score = v + hintBonus(toCell(q), hints)
         if (v > alpha) {
           alpha = v
+        }
+        if (score > bestScore) {
+          bestScore = score
           iterBest = q
         }
       }
@@ -768,7 +797,7 @@ export function chooseGauntletMove(moves: Move[], side: Side, opts: GauntletOpti
       root = [iterBest, ...root.filter((q) => q !== iterBest)]
     } else {
       // Partial iteration: a move that beat the previous best at this depth is better information.
-      if (iterBest >= 0 && iterBest !== root[0] && alpha > firstValue) bestMove = iterBest
+      if (iterBest >= 0 && iterBest !== root[0] && bestScore > firstValue + hintBonus(toCell(root[0]), hints)) bestMove = iterBest
       break
     }
   }

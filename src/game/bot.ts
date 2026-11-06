@@ -17,6 +17,7 @@ import { BOARD_MAX, BOARD_MIN, type Cell, type Move, type Side } from './types';
 
 import type { BotLevel } from '@/src/tournament/types'
 import { chooseGauntletMove } from './bot-gauntlet'
+import type { GauntletHints } from './gauntlet-learn'
 
 export type BotOptions = {
   mode: 'full' | 'fast'
@@ -24,6 +25,7 @@ export type BotOptions = {
   timeBudgetMs?: number
   level?: BotLevel
   rng?: () => number
+  hints?: GauntletHints
 }
 
 export interface BotStrength {
@@ -418,6 +420,7 @@ export function chooseBotMove(moves: Move[], side: Side, opts: BotOptions): Cell
     return chooseGauntletMove(moves, side, {
       timeBudgetMs: opts.timeBudgetMs ?? strengthForLevel('gauntlet').timeBudgetMs,
       rng: opts.rng,
+      hints: opts.hints,
     });
   }
   if (moves.length === 0) return { x: 0, y: 0 };

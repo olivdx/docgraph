@@ -18,6 +18,7 @@ export async function ensureIndexes(db: Db): Promise<void> {
   const rooms = db.collection('rooms')
   const presence = db.collection('presence')
   const sudoku = db.collection('sudoku_rooms')
+  const gauntletGames = db.collection('gauntlet_games')
   await Promise.all([
     rooms.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     rooms.createIndex({ status: 1, createdAt: -1 }),
@@ -27,6 +28,7 @@ export async function ensureIndexes(db: Db): Promise<void> {
     sudoku.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     sudoku.createIndex({ status: 1, createdAt: -1 }),
     sudoku.createIndex({ 'players.userId': 1 }),
+    gauntletGames.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ])
 }
 

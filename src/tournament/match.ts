@@ -1,4 +1,5 @@
 import { chooseBotMove } from '@/src/game/bot'
+import type { GauntletHints } from '@/src/game/gauntlet-learn'
 import { buildBoard, findWin, sideToMove } from '@/src/game/rules'
 import type { Cell, Side } from '@/src/game/types'
 import {
@@ -39,6 +40,8 @@ export type Presence = Record<string, number> | null
  */
 export interface SettleOpts {
   fullBotMatchId?: string | null
+  /** Learned Gauntlet book for the bot's upcoming full-strength move (see gauntlet-learn). */
+  hints?: GauntletHints
 }
 
 type Rng = () => number
@@ -357,7 +360,12 @@ export function stepMatch(
           finishGame(room, m, 'X', 'board_full', ev.at, rng)
         } else {
           const side = sideToMove(m.moves)
-          const cell = chooseBotMove(m.moves, side, { mode: 'full', level: resolveBotLevel(room), rng })
+          const cell = chooseBotMove(m.moves, side, {
+            mode: 'full',
+            level: resolveBotLevel(room),
+            rng,
+            hints: opts?.hints,
+          })
           applyMove(room, m, cell, side, ev.at, rng)
         }
       }

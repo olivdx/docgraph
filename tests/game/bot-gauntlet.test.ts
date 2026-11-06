@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { bookMove, chooseGauntletMove, GauntletEngine, __test } from '@/src/game/bot-gauntlet'
+import { bookMove, chooseGauntletMove, GauntletEngine, isForcedPosition, __test } from '@/src/game/bot-gauntlet'
 import { chooseBotMove } from '@/src/game/bot'
 import { buildBoard, findWin, isInside } from '@/src/game/rules'
+import type { GauntletHints } from '@/src/game/gauntlet-learn'
 import type { Cell, Move, Side } from '@/src/game/types'
 
 const mv = (x: number, y: number, side: Side): Move => ({ x, y, side, at: 0 })
@@ -162,5 +163,49 @@ describe('Gauntlet opening book', () => {
   it('out of book after a distant reply or later', () => {
     expect(bookMove([mv(0, 0, 'X'), mv(3, 0, 'O')], 'X')).toBeNull()
     expect(bookMove([mv(0, 0, 'X'), mv(1, 1, 'O'), mv(1, -1, 'X')], 'O')).toBeNull()
+  })
+})
+
+describe('isForcedPosition', () => {
+  it('is true when we can make five', () => {
+    expect(isForcedPosition([...row(0, 3, 0, 'X'), ...row(0, 3, 5, 'O')], 'X')).toBe(true)
+  })
+
+  it('is true when the opponent threatens five', () => {
+    expect(isForcedPosition([...row(0, 3, 0, 'X'), ...row(0, 2, 5, 'O')], 'O')).toBe(true)
+  })
+
+  it('is true when we have an open four', () => {
+    expect(isForcedPosition([...row(1, 4, 0, 'X'), ...row(0, 2, 5, 'O')], 'X')).toBe(true)
+  })
+
+  it('is false in a quiet position', () => {
+    expect(isForcedPosition([mv(0, 0, 'X'), mv(1, 1, 'O'), mv(2, 0, 'X')], 'O')).toBe(false)
+  })
+})
+
+describe('chooseGauntletMove with hints', () => {
+  const moves = midgame(9, 8)
+  const side: Side = moves.length % 2 === 0 ? 'X' : 'O'
+  const base = chooseGauntletMove(moves, side, { timeBudgetMs: 150, rng: mulberry32(1) })
+
+  it('uses a non-forced midgame seed', () => {
+    expect(isForcedPosition(moves, side)).toBe(false)
+  })
+
+  it('plays the same move with empty hints', () => {
+    expect(chooseGauntletMove(moves, side, { timeBudgetMs: 150, rng: mulberry32(1), hints: new Map() })).toEqual(base)
+  })
+
+  it('avoids a condemned move', () => {
+    const hints: GauntletHints = new Map([[`${base.x},${base.y}`, { w: -6, n: 4, wins: 0, losses: 4 }]])
+    const got = chooseGauntletMove(moves, side, { timeBudgetMs: 150, rng: mulberry32(1), hints })
+    expect(got).not.toEqual(base)
+  })
+
+  it('does not avoid a move condemned on too little evidence', () => {
+    const hints: GauntletHints = new Map([[`${base.x},${base.y}`, { w: -6, n: 2, wins: 0, losses: 2 }]])
+    const got = chooseGauntletMove(moves, side, { timeBudgetMs: 150, rng: mulberry32(1), hints })
+    expect(got).toEqual(base)
   })
 })

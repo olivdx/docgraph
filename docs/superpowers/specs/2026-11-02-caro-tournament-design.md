@@ -119,6 +119,11 @@ Vercel has no long-lived processes and no WebSocket server, so:
 - Measured 2026-11-06: new Gauntlet (2 s) beat the previous Gauntlet (0.7 s) 40–0 over 40 games with swapped colours and varied 3-stone openings (20–0 at equal 2 s). Against Duel it first went 16–4; replaying the losses showed it missed its own forced win because VCT searched depth 10 first and timed out. With iterative-deepening VCT (own and opponent's) and the search using the whole budget, the same 20 games went 19–1.
 - Trade-off: the bot's move is computed inside the human's next poll, so a Gauntlet reply now lands ~2.5–3 s after the human's move (was ~1.5 s).
 
+### Gauntlet learning, added 2026-11-06 (owner decision)
+
+- Owner: the Gauntlet bot stores every game it plays against a human and learns from it: moves that keep losing are dropped once seen enough, moves from won games are preferred. Full design: `2026-11-06-gauntlet-learning-design.md`.
+- Implementation: `src/game/gauntlet-learn.ts` (canonical position over 8 symmetries, per-game deltas, filter/bonus), `src/server/gauntlet-book-store.ts` (collections `gauntlet_book`, `gauntlet_games` with a 90-day TTL on replays), `src/server/gauntlet-learning.ts` (prefetch hints for the bot's move with a 150 ms cap; `learnFromWrite` after each successful room persist). Learning applies only to human-vs-Gauntlet games that end in `five_in_row` or a human `resign`.
+
 ### Realtime (Ably), added 2026-11-04
 
 - Ably is a doorbell, not a data channel. After every successful write the server publishes `changed` with `{ v: version }` on the affected channels: `caro:<code>` when the lobby/bracket shape changes, `caro:<code>:<matchId>` for each match that changed, and `sudoku:<code>` for any Sudoku room write. Clients re-fetch through the normal API, so MongoDB stays the single source of truth and no game data (or Sudoku solution) goes through Ably.

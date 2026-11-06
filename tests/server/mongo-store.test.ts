@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { MongoClient, type Db } from 'mongodb'
 import type { MongoMemoryServer } from 'mongodb-memory-server'
 import { ensureIndexes } from '@/src/server/db'
+import type { GameRecord } from '@/src/game/gauntlet-learn'
+import { MongoGauntletBookStore } from '@/src/server/gauntlet-book-store'
 import { MongoPresenceStore, MongoRoomStore } from '@/src/server/stores'
 import { createRoom, joinRoom, startRoom } from '@/src/tournament/room'
 import type { Room } from '@/src/tournament/types'
@@ -132,5 +134,40 @@ describe('Mongo stores', () => {
     const presIdx = await db.collection('presence').indexes()
     const pttl = presIdx.find((i) => JSON.stringify(i.key) === JSON.stringify({ expiresAt: 1 }))
     expect(pttl?.expireAfterSeconds).toBe(0)
+    const gauntletIdx = await db.collection('gauntlet_games').indexes()
+    const gttl = gauntletIdx.find((i) => JSON.stringify(i.key) === JSON.stringify({ expiresAt: 1 }))
+    expect(gttl?.expireAfterSeconds).toBe(0)
+  })
+})
+
+describe('MongoGauntletBookStore', () => {
+  const rec: GameRecord = {
+    _id: 'R:M:1',
+    roomCode: 'R',
+    matchId: 'M',
+    gameIndex: 1,
+    moves: [],
+    botSide: 'O',
+    winnerSide: 'X',
+    endReason: 'five_in_row',
+    createdAt: T0,
+  }
+
+  it('inserts a game once', async (ctx) => {
+    if (!db) return ctx.skip()
+    const store = new MongoGauntletBookStore(db)
+    expect(await store.insertGame(rec)).toBe(true)
+    expect(await store.insertGame(rec)).toBe(false)
+  })
+
+  it('upserts and increments book entries', async (ctx) => {
+    if (!db) return ctx.skip()
+    const store = new MongoGauntletBookStore(db)
+    await store.applyDeltas([{ key: 'k1', side: 'O', cell: '1,1', delta: -2, won: false }], T0)
+    await store.applyDeltas([{ key: 'k1', side: 'O', cell: '1,1', delta: 1, won: true }], T0 + 1)
+    const doc = await store.getBook('k1', 'O')
+    expect(doc?.moves['1,1']).toEqual({ w: -1, n: 2, wins: 1, losses: 1 })
+    expect(doc?.updatedAt).toBe(T0 + 1)
+    expect(await store.getBook('k1', 'X')).toBeNull()
   })
 })
