@@ -1,8 +1,8 @@
-export type ShipKey = 'galleon' | 'brig' | 'sloop'
+export type ShipKey = 'ghost' | 'galleon' | 'frigate' | 'brig' | 'sloop'
 
 export interface Ship {
   key: ShipKey
-  /** Board cells (row * 6 + col), in order along the ship. */
+  /** Board cells (row * N + col), in order along the ship. */
   cells: number[]
 }
 

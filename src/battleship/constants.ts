@@ -3,13 +3,17 @@ import type { ShipKey } from './types'
 export { FINISHED_TTL_MS, LOBBY_TTL_MS } from '@/src/tournament/constants'
 
 /** The sea is N×N; cell = row * N + col. */
-export const N = 6
+export const N = 10
 export const CELLS = N * N
+/** The classic 5-4-3-3-2 fleet (17 of 100 cells). */
 export const FLEET: readonly { key: ShipKey; name: string; len: number }[] = [
-  { key: 'galleon', name: 'Galleon', len: 3 },
-  { key: 'brig', name: 'Brig', len: 2 },
+  { key: 'ghost', name: 'Ghost Ship', len: 5 },
+  { key: 'galleon', name: 'Galleon', len: 4 },
+  { key: 'frigate', name: 'Frigate', len: 3 },
+  { key: 'brig', name: 'Brig', len: 3 },
   { key: 'sloop', name: 'Sloop', len: 2 },
 ]
+export const MAX_SHIP_LEN = Math.max(...FLEET.map((f) => f.len))
 
 /** Caro codes are 6 chars, Sudoku 5, Battleship 4: a ref link's game is clear from its length. */
 export const BATTLE_CODE_LEN = 4

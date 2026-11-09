@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createBattleRoom, fire, joinBattle, markBattleReady, saveFleet, startBattle } from '@/src/battleship/room'
-import type { BattleRoom, Seat, Ship } from '@/src/battleship/types'
+import type { BattleRoom, Seat } from '@/src/battleship/types'
 import { toBattleMatchView, toBattleRoomView, toBattleSummary } from '@/src/battleship/views'
 import { mulberry, user } from '../tournament/helpers'
+import { FLEET_A as FLEET, SHIP_CELLS, WATER } from './helpers'
 
 const T0 = 1_800_000_000_000
-const FLEET: Ship[] = [
-  { key: 'galleon', cells: [0, 1, 2] },
-  { key: 'brig', cells: [12, 18] },
-  { key: 'sloop', cells: [34, 35] },
-]
-const WATER = [5, 7, 9, 21, 23, 27, 29, 31]
 
 function cup(n: number): BattleRoom {
   let r = createBattleRoom({ code: 'ABCD', host: user(1), now: T0 })
@@ -25,7 +20,7 @@ function toBattle(r: BattleRoom, id: string, t: number): BattleRoom {
   return r
 }
 
-/** shooter: brig hit once, sloop sunk; the other side only misses. */
+/** shooter (who moves first, and keeps the turn while hitting): brig hit once, sloop sunk. */
 function midBattle() {
   let r = cup(2)
   const id = r.matches[0].id
@@ -33,10 +28,10 @@ function midBattle() {
   const m0 = r.matches[0]
   const shooter = m0.turn!
   const other: Seat = shooter === 'a' ? 'b' : 'a'
-  const plan: Record<Seat, number[]> = { [shooter]: [12, 34, 35], [other]: WATER } as Record<Seat, number[]>
+  const plan: Record<Seat, number[]> = { [shooter]: [62, 98, 99], [other]: WATER } as Record<Seat, number[]>
   const used: Record<Seat, number> = { a: 0, b: 0 }
   let t = T0
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 3; i++) {
     const m = r.matches[0]
     const seat = m.turn!
     t += 1000
@@ -51,10 +46,10 @@ describe('toBattleMatchView', () => {
     const m = r.matches[0]
     const asOther = toBattleMatchView(r, id, m[other]!, t, null)
     // The shooter fired at `other`'s fleet: other sees its own fleet in full.
-    expect(asOther.fleets[other]).toHaveLength(3)
+    expect(asOther.fleets[other]).toHaveLength(5)
     // The shooter's own view of the other fleet: only the sunk sloop.
     const asShooter = toBattleMatchView(r, id, m[shooter]!, t, null)
-    expect(asShooter.fleets[other]).toEqual([{ key: 'sloop', cells: [34, 35] }])
+    expect(asShooter.fleets[other]).toEqual([{ key: 'sloop', cells: [98, 99] }])
     const shots = asShooter.shots[shooter]
     expect(shots.map((s) => [s.result, s.shipKey])).toEqual([
       ['hit', null],
@@ -63,7 +58,7 @@ describe('toBattleMatchView', () => {
     ])
     const watcher = toBattleMatchView(r, id, 'u9', t, null)
     expect(watcher.you).toBeNull()
-    expect(watcher.fleets[other]).toEqual([{ key: 'sloop', cells: [34, 35] }])
+    expect(watcher.fleets[other]).toEqual([{ key: 'sloop', cells: [98, 99] }])
     expect(watcher.fleets[shooter]).toEqual([])
     expect(JSON.stringify(asShooter.fleets[other])).not.toContain('"brig"')
     expect(JSON.stringify(watcher)).not.toContain('"brig"')
@@ -74,7 +69,7 @@ describe('toBattleMatchView', () => {
     const id = r.matches[0].id
     r = toBattle(r, id, T0)
     const shooter = r.matches[0].turn!
-    const order = [0, 1, 2, 12, 18, 34, 35]
+    const order = SHIP_CELLS
     let k = 0
     let w = 0
     for (let t = T0 + 1000; r.matches[0].status === 'playing'; t += 1000) {
@@ -84,8 +79,8 @@ describe('toBattleMatchView', () => {
       r = fire(r, id, m[seat]!, cell, m.shots[seat].length + 1, t, mulberry(1), null)
     }
     const v = toBattleMatchView(r, id, 'u9', T0 + 99_000, null)
-    expect(v.fleets.a).toHaveLength(3)
-    expect(v.fleets.b).toHaveLength(3)
+    expect(v.fleets.a).toHaveLength(5)
+    expect(v.fleets.b).toHaveLength(5)
     expect(v.winner).toBe(shooter)
   })
 
@@ -147,7 +142,7 @@ describe('room view and nextStep', () => {
       for (let t = t0; r.matches.find((x) => x.id === id)!.status === 'playing'; t += 1000) {
         const m = r.matches.find((x) => x.id === id)!
         const seat = m.turn!
-        const cell = seat === winner ? [0, 1, 2, 12, 18, 34, 35][k++] : WATER[w++]
+        const cell = seat === winner ? SHIP_CELLS[k++] : WATER[w++]
         r = fire(r, id, m[seat]!, cell, m.shots[seat].length + 1, t, mulberry(1), null)
       }
     }

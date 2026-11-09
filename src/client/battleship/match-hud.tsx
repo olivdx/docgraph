@@ -29,7 +29,7 @@ function Pips({ view, seat, own }: { view: BattleMatchView; seat: Seat; own: boo
   const sunk = new Set(incoming.filter((s) => s.result === 'sunk').map((s) => s.shipKey))
   const hitCells = new Set(incoming.filter((s) => s.result !== 'miss').map((s) => s.cell))
   return (
-    <div className={`flex gap-1 ${own ? '' : 'justify-end'}`}>
+    <div className={`flex gap-0.5 ${own ? '' : 'justify-end'}`}>
       {FLEET.map((def) => {
         const ship = view.fleets[seat].find((s) => s.key === def.key)
         const isSunk = sunk.has(def.key)
@@ -40,7 +40,7 @@ function Pips({ view, seat, own }: { view: BattleMatchView; seat: Seat; own: boo
               return (
                 <i
                   key={k}
-                  className={`block h-[10px] w-[7px] rounded-[2px] ${isSunk ? 'bg-muted' : hit ? 'bg-o' : 'bg-text'}`}
+                  className={`block h-[9px] w-1 rounded-[1px] ${isSunk ? 'bg-muted' : hit ? 'bg-o' : 'bg-text'}`}
                 />
               )
             })}

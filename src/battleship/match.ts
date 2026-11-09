@@ -93,7 +93,10 @@ function beginBattle(m: BattleMatch, at: number, rng: Rng): void {
   m.turnDeadlineAt = at + TURN_MS
 }
 
-/** Records `seat`'s shot at `cell`, then ends the match or passes the turn (with the animation grace). */
+/**
+ * Records `seat`'s shot at `cell`, then ends the match or sets the next turn: a hit (or sink) lets
+ * the shooter fire again, a miss passes the turn. Either way the clock restarts with the animation grace.
+ */
 export function applyShot(room: BattleRoom, m: BattleMatch, seat: Seat, cell: number, at: number, auto: boolean): void {
   const target = otherSeat(seat)
   const { result, shipKey } = resolveShot(m.fleets[target], m.shots[seat], cell)
@@ -102,7 +105,7 @@ export function applyShot(room: BattleRoom, m: BattleMatch, seat: Seat, cell: nu
     finishMatch(room, m, seat, 'fleet_sunk', at)
     return
   }
-  m.turn = target
+  m.turn = result === 'miss' ? target : seat
   m.turnDeadlineAt = at + SHOT_GRACE_MS + TURN_MS
 }
 

@@ -9,14 +9,17 @@
  * Board 'me' is the viewer's own sea (x = -7), 'enemy' the opponent's (x = +7).
  */
 import * as THREE from 'three'
-import { FLEET, N } from '@/src/battleship/constants'
+import { FLEET, MAX_SHIP_LEN, N } from '@/src/battleship/constants'
 import type { Ship, ShipKey } from '@/src/battleship/types'
 import type { ShotView } from '@/src/battleship/views'
 import { fit, SHIP_MODEL, type FitOpts, type ModelName, type Models } from './models'
 import type { Board } from './sync'
 
-const COLS = 'ABCDEF'
-const BOARD_X: Record<Board, number> = { me: -7, enemy: 7 }
+const COLS = 'ABCDEFGHIJ'
+/** Sea centres: one board width plus a gap apart, with the middle island between them. */
+const BOARD_X: Record<Board, number> = { me: -(N + 1), enemy: N + 1 }
+/** Decor was laid out around a 6×6 sea (edges at ±3): push it out to this sea's edges. */
+const out = (v: number) => v + Math.sign(v) * (N / 2 - 3)
 const BOARDS: Board[] = ['me', 'enemy']
 
 const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
@@ -76,7 +79,7 @@ interface ShipObj {
 export class BattleScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
-  private camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
+  private camera = new THREE.PerspectiveCamera(42, 1, 0.1, N * 20)
   private waterMat: THREE.ShaderMaterial
   private clock = new THREE.Clock()
   private raf = 0
@@ -113,7 +116,7 @@ export class BattleScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.scene.background = new THREE.Color('#7cc8ea')
-    this.scene.fog = new THREE.Fog('#7cc8ea', 18, 40)
+    this.scene.fog = new THREE.Fog('#7cc8ea', N * 4, N * 9)
     this.scene.add(new THREE.HemisphereLight(0xe6f6ff, 0x2a6f8f, 1.7))
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.4)
     sun.position.set(6, 12, 7)
@@ -129,7 +132,7 @@ export class BattleScene {
           gl_FragColor = vec4(base + w * .025, 1.0);
         }`,
     })
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), this.waterMat)
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(N * 24, N * 24), this.waterMat)
     water.rotation.x = -Math.PI / 2
     this.scene.add(water)
 
@@ -151,7 +154,8 @@ export class BattleScene {
     this.camera.updateProjectionMatrix()
     const v = THREE.MathUtils.degToRad(this.camera.fov)
     const hf = 2 * Math.atan(Math.tan(v / 2) * this.camera.aspect)
-    this.camDist = Math.max(4.3 / Math.tan(hf / 2), 5.4 / Math.tan(v / 2)) * 1.05
+    // wide enough for the sea and its labels, tall enough for both cannons
+    this.camDist = Math.max((N / 2 + 1.3) / Math.tan(hf / 2), (N / 2 + 2.4) / Math.tan(v / 2)) * 1.05
   }
 
   dispose(): void {
@@ -423,41 +427,41 @@ export class BattleScene {
 
   private decorate(key: Board, R: THREE.Object3D): void {
     if (key === 'enemy') {
-      this.foam(R, -3.7, -4.4, 1.25)
-      this.place(R, 'patch-sand-foliage', { maxXZ: 2.4 }, -3.7, -4.4, { y: -0.05 })
-      this.place(R, 'tower-complete-small', { height: 1.9 }, -3.95, -4.6, { ry: 0.4 })
-      this.place(R, 'flag-pirate-high', { height: 1.4 }, -3.05, -4.05, { ry: -0.5 })
-      this.foam(R, 3.8, -4.3, 0.95)
-      this.place(R, 'ship-wreck', { maxXZ: 1.8 }, 3.8, -4.3, { y: -0.12, ry: 2.2 })
-      this.place(R, 'rocks-sand-a', { maxXZ: 0.9 }, 4.5, -3.4, { y: -0.05 })
-      this.foam(R, 3.6, 4.4, 0.9)
-      this.place(R, 'patch-sand', { maxXZ: 1.6 }, 3.6, 4.4, { y: -0.05 })
-      this.place(R, 'palm-detailed-bend', { height: 1.7 }, 3.6, 4.4, { ry: 2.5 })
-      this.foam(R, -3.6, 4.4, 0.6)
-      this.place(R, 'rocks-sand-b', { maxXZ: 1 }, -3.6, 4.4, { y: -0.05 })
-      this.place(R, 'barrel', { height: 0.36 }, 4.3, 1.6, { y: -0.1, bob: true, tilt: 0.5 })
-      this.place(R, 'bottle', { height: 0.3 }, -4.2, 0.6, { y: -0.08, bob: true, tilt: 0.9 })
-      this.place(R, 'crate', { maxXZ: 0.4 }, 4.4, -1.2, { y: -0.12, ry: 0.6, bob: true })
-      this.place(R, 'rocks-c', { maxXZ: 0.8 }, -4.4, -1.8, { y: -0.08 })
+      this.foam(R, out(-3.7), out(-4.4), 1.25)
+      this.place(R, 'patch-sand-foliage', { maxXZ: 2.4 }, out(-3.7), out(-4.4), { y: -0.05 })
+      this.place(R, 'tower-complete-small', { height: 1.9 }, out(-3.95), out(-4.6), { ry: 0.4 })
+      this.place(R, 'flag-pirate-high', { height: 1.4 }, out(-3.05), out(-4.05), { ry: -0.5 })
+      this.foam(R, out(3.8), out(-4.3), 0.95)
+      this.place(R, 'ship-wreck', { maxXZ: 1.8 }, out(3.8), out(-4.3), { y: -0.12, ry: 2.2 })
+      this.place(R, 'rocks-sand-a', { maxXZ: 0.9 }, out(4.5), out(-3.4), { y: -0.05 })
+      this.foam(R, out(3.6), out(4.4), 0.9)
+      this.place(R, 'patch-sand', { maxXZ: 1.6 }, out(3.6), out(4.4), { y: -0.05 })
+      this.place(R, 'palm-detailed-bend', { height: 1.7 }, out(3.6), out(4.4), { ry: 2.5 })
+      this.foam(R, out(-3.6), out(4.4), 0.6)
+      this.place(R, 'rocks-sand-b', { maxXZ: 1 }, out(-3.6), out(4.4), { y: -0.05 })
+      this.place(R, 'barrel', { height: 0.36 }, out(4.3), out(1.6), { y: -0.1, bob: true, tilt: 0.5 })
+      this.place(R, 'bottle', { height: 0.3 }, out(-4.2), out(0.6), { y: -0.08, bob: true, tilt: 0.9 })
+      this.place(R, 'crate', { maxXZ: 0.4 }, out(4.4), out(-1.2), { y: -0.12, ry: 0.6, bob: true })
+      this.place(R, 'rocks-c', { maxXZ: 0.8 }, out(-4.4), out(-1.8), { y: -0.08 })
     } else {
-      this.foam(R, -3.7, 4.4, 1.2)
-      this.place(R, 'patch-sand', { maxXZ: 2.3 }, -3.7, 4.4, { y: -0.05 })
-      this.place(R, 'tower-watch', { height: 1.7 }, -3.95, 4.6)
-      this.place(R, 'structure-platform-dock-small', { maxXZ: 1 }, -2.55, 4.15, { y: -0.02, ry: Math.PI / 2 })
-      this.place(R, 'boat-row-small', { maxXZ: 0.8 }, -2.2, 4.95, { y: -0.08, ry: 0.3, bob: true })
-      this.foam(R, 3.7, 4.4, 1.1)
-      this.place(R, 'patch-sand-foliage', { maxXZ: 2.1 }, 3.7, 4.4, { y: -0.05 })
-      this.place(R, 'palm-detailed-straight', { height: 1.9 }, 3.95, 4.6)
-      this.place(R, 'chest', { maxXZ: 0.45 }, 3.2, 4.1, { ry: -0.6 })
-      this.foam(R, 3.8, -4.4, 0.8)
-      this.place(R, 'rocks-sand-a', { maxXZ: 1.2 }, 3.8, -4.4, { y: -0.05 })
-      this.place(R, 'grass-plant', { height: 0.5 }, 3.55, -4.2)
-      this.foam(R, -3.8, -4.4, 1)
-      this.place(R, 'patch-sand', { maxXZ: 1.6 }, -3.8, -4.4, { y: -0.05 })
-      this.place(R, 'palm-bend', { height: 1.6 }, -3.8, -4.4, { ry: 1 })
-      this.place(R, 'barrel', { height: 0.36 }, -4.3, 1.4, { y: -0.1, bob: true, tilt: 0.5 })
-      this.place(R, 'rocks-b', { maxXZ: 0.8 }, 4.4, 0.4, { y: -0.08 })
-      this.place(R, 'crate-bottles', { maxXZ: 0.45 }, 4.3, -2, { y: -0.14, ry: 0.4, bob: true })
+      this.foam(R, out(-3.7), out(4.4), 1.2)
+      this.place(R, 'patch-sand', { maxXZ: 2.3 }, out(-3.7), out(4.4), { y: -0.05 })
+      this.place(R, 'tower-watch', { height: 1.7 }, out(-3.95), out(4.6))
+      this.place(R, 'structure-platform-dock-small', { maxXZ: 1 }, out(-2.55), out(4.15), { y: -0.02, ry: Math.PI / 2 })
+      this.place(R, 'boat-row-small', { maxXZ: 0.8 }, out(-2.2), out(4.95), { y: -0.08, ry: 0.3, bob: true })
+      this.foam(R, out(3.7), out(4.4), 1.1)
+      this.place(R, 'patch-sand-foliage', { maxXZ: 2.1 }, out(3.7), out(4.4), { y: -0.05 })
+      this.place(R, 'palm-detailed-straight', { height: 1.9 }, out(3.95), out(4.6))
+      this.place(R, 'chest', { maxXZ: 0.45 }, out(3.2), out(4.1), { ry: -0.6 })
+      this.foam(R, out(3.8), out(-4.4), 0.8)
+      this.place(R, 'rocks-sand-a', { maxXZ: 1.2 }, out(3.8), out(-4.4), { y: -0.05 })
+      this.place(R, 'grass-plant', { height: 0.5 }, out(3.55), out(-4.2))
+      this.foam(R, out(-3.8), out(-4.4), 1)
+      this.place(R, 'patch-sand', { maxXZ: 1.6 }, out(-3.8), out(-4.4), { y: -0.05 })
+      this.place(R, 'palm-bend', { height: 1.6 }, out(-3.8), out(-4.4), { ry: 1 })
+      this.place(R, 'barrel', { height: 0.36 }, out(-4.3), out(1.4), { y: -0.1, bob: true, tilt: 0.5 })
+      this.place(R, 'rocks-b', { maxXZ: 0.8 }, out(4.4), out(0.4), { y: -0.08 })
+      this.place(R, 'crate-bottles', { maxXZ: 0.45 }, out(4.3), out(-2), { y: -0.14, ry: 0.4, bob: true })
     }
   }
 
@@ -471,7 +475,7 @@ export class BattleScene {
     this.place(G, 'palm-detailed-straight', { height: 2.4 }, 0.5, -0.2)
     this.foam(G, 0.3, 1.5, 0.6)
     this.place(G, 'rocks-sand-c', { maxXZ: 1 }, 0.3, 1.5, { y: -0.05 })
-    this.place(G, 'ship-ghost', { maxXZ: 3 }, -1, -9, { y: -0.1, ry: 0.5, bob: true })
+    this.place(G, 'ship-wreck', { maxXZ: 3 }, -1, -(N + 4), { y: -0.1, ry: 0.5, bob: true })
   }
 
   private buildTarget(): void {
@@ -532,7 +536,7 @@ export class BattleScene {
   }
 
   private buildGhostTiles(): void {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < MAX_SHIP_LEN; i++) {
       const m = new THREE.Mesh(
         new THREE.PlaneGeometry(0.94, 0.94),
         new THREE.MeshBasicMaterial({ color: '#4fd18b', transparent: true, opacity: 0.5, depthWrite: false }),

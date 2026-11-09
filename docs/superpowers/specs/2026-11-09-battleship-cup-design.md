@@ -53,17 +53,17 @@ A throwaway prototype shows the intended look and feel: `public/battleship-previ
 ## 4. Calls made by Claude (owner may override)
 
 **Rules of one match**
-- Sea 6×6, columns A–F, rows 1–6. Fleet: **Galleon** (3 cells), **Brig** (2), **Sloop** (2). Ships are straight lines, horizontal or vertical.
+- Sea 10×10, columns A–J, rows 1–10. Fleet (owner, 2026-11-09): **Ghost Ship** 5, **Galleon** 4, **Frigate** 3, **Brig** 3, **Sloop** 2 (17 of 100 cells). Ships are straight lines, horizontal or vertical.
 - Placement rule: ships may not overlap; touching is allowed. (Random placement still avoids touching, as the prototype does, because it looks cleaner.)
-- Who fires first is random. Turns strictly alternate; a hit does **not** grant another shot.
+- Who fires first is random. **A hit (or sink) lets the shooter fire again** (owner, 2026-11-09); a miss passes the turn. This also holds for a server auto-shot that hits.
 - A ship sinks when all its cells are hit. When it sinks, its position is revealed to the shooter. The match ends when one fleet is fully sunk.
-- With 7 ship cells out of 36, a match is at most 70 shots (35 each); in practice 20–40.
+- With 17 ship cells out of 100, a match is at most 199 shots; in practice roughly 80–120 in total.
 
 **Match flow and clocks**
 - `pending`: created when both slots are filled. Ready check exactly like Caro: a player is ready the first time they open the match screen. No-show rule: not opened within 60 s of `pending` loses with `no_show`; if both no-show, the higher seed advances.
 - `placing`: starts when both are ready. Each player has **45 s** to place and press Ready. A player who hasn't locked in when the 45 s run out gets the rest of their fleet placed randomly (ships already placed are kept) and is locked in. Battle starts as soon as both are locked in.
 - `playing`: each turn has **20 s**. When it runs out, the server fires one random shot at an unfired cell for that player. **Three missed turns in a row** lose the match with `afk`. A shot the player makes resets their counter.
-- Animation grace: after any shot, the next turn's deadline is `shot time + 3 s + 20 s`. The 3 s (`SHOT_GRACE_MS`) cover the poll delay and the cannon/hit animation; the client counts down only the 20 s part, so the player always sees a full 20 s. The very first turn has no grace.
+- Animation grace: after any shot (including a bonus shot after a hit), the next turn's deadline is `shot time + 3 s + 20 s`. The 3 s (`SHOT_GRACE_MS`) cover the poll delay and the cannon/hit animation; the client counts down only the 20 s part, so the player always sees a full 20 s. The very first turn has no grace.
 - Presence and disconnect: same as Caro (heartbeat from match-screen polls, disconnected after 5 s, loses with `disconnect_timeout` after 35 s), during `placing` and `playing`.
 - **Give up** button during `placing` and `playing`, with a confirm: loses the match with `resign`.
 - End reasons: `fleet_sunk`, `no_show`, `afk`, `disconnect_timeout`, `resign`.

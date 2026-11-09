@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { FLEET } from '@/src/battleship/constants'
+import { FLEET, N } from '@/src/battleship/constants'
 import { centeredCells, randomFleet } from '@/src/battleship/fleet'
 import type { Ship, ShipKey } from '@/src/battleship/types'
 import type { BattleMatchView } from '@/src/battleship/views'
@@ -191,7 +191,7 @@ export function usePlacement(opts: {
     }
     if (active) {
       horiz.current = !horiz.current
-      showGhost(14)
+      showGhost(Math.floor(N / 2) * N + Math.floor(N / 2) - 1) // middle of your sea
     }
   }, [locked, active, last, ships, showGhost, rotateLast])
 
@@ -268,13 +268,13 @@ export function ShipTray({ p }: { p: Placement }) {
             type="button"
             disabled={p.locked}
             onClick={() => p.select(f.key)}
-            className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl border bg-[#0b1f33]/80 px-1 py-2 text-xs font-bold text-white disabled:opacity-60 ${
+            className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl border bg-[#0b1f33]/80 px-0.5 py-2 text-[11px] leading-tight font-bold text-white disabled:opacity-60 ${
               p.active === f.key ? 'border-amber-400 shadow-[0_0_0_2px_rgba(255,182,39,.45)]' : 'border-white/25'
             } ${placed ? 'opacity-60' : ''}`}
           >
             <span className="flex gap-0.5">
               {Array.from({ length: f.len }, (_, k) => (
-                <i key={k} className={`block size-2.5 rounded-[2px] ${placed ? 'bg-emerald-400' : 'bg-white'}`} />
+                <i key={k} className={`block size-2 rounded-[2px] ${placed ? 'bg-emerald-400' : 'bg-white'}`} />
               ))}
             </span>
             {f.name}

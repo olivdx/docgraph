@@ -10,6 +10,7 @@ import { SudokuService } from './sudoku-service'
 import { BattleshipService } from './battleship-service'
 import { MongoBattleStore } from './battleship-store'
 import type { Ship } from '@/src/battleship/types'
+import { FLEET, MAX_SHIP_LEN } from '@/src/battleship/constants'
 import { MongoSudokuStore } from './sudoku-store'
 import { isDifficulty, type Difficulty } from '@/src/sudoku/types'
 import { isBotLevel, isMatchFormat, RoomError, type BotLevel, type MatchFormat } from '@/src/tournament/types'
@@ -189,10 +190,10 @@ export function parseEntryBody(json: unknown): { cell: number; digit: number; se
 /** Shape check only; validateFleet does the game rules. */
 export function parseFleetBody(json: unknown): { ships: Ship[]; lock: boolean } {
   if (!isObject(json) || !Array.isArray(json.ships) || typeof json.lock !== 'boolean') throw badRequest()
-  if (json.ships.length > 3) throw badRequest()
+  if (json.ships.length > FLEET.length) throw badRequest()
   const ships = json.ships.map((s: unknown) => {
     if (!isObject(s) || typeof s.key !== 'string' || !Array.isArray(s.cells)) throw badRequest()
-    if (s.cells.length > 3 || !s.cells.every((c: unknown) => Number.isInteger(c))) throw badRequest()
+    if (s.cells.length > MAX_SHIP_LEN || !s.cells.every((c: unknown) => Number.isInteger(c))) throw badRequest()
     return { key: s.key as Ship['key'], cells: s.cells as number[] }
   })
   return { ships, lock: json.lock }
