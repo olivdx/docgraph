@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildInviteUrl, errorResponse, parseCreateBody, parseFormatBody, parseMoveBody } from '@/src/server/http'
+import { buildInviteUrl, errorResponse, parseCreateBody, parseFireBody, parseFleetBody, parseFormatBody, parseMoveBody } from '@/src/server/http'
 import { RoomError } from '@/src/tournament/types'
+import { roomPath } from '@/src/client/routes'
 
 describe('errorResponse', () => {
   const cases: Array<[ConstructorParameters<typeof RoomError>[0], number]> = [
@@ -89,5 +90,41 @@ describe('parseFormatBody', () => {
 describe('errorResponse: free play', () => {
   it('too_many_players -> 409', () => {
     expect(errorResponse(new RoomError('too_many_players')).status).toBe(409)
+  })
+})
+
+describe('parseFleetBody', () => {
+  it('accepts up to 3 ships with integer cells and a boolean lock', () => {
+    const ships = [{ key: 'brig', cells: [0, 1] }]
+    expect(parseFleetBody({ ships, lock: false })).toEqual({ ships, lock: false })
+  })
+  it('rejects malformed bodies with 400', async () => {
+    const bad = [
+      { ships: 'x', lock: true },
+      { ships: [1, 2, 3, 4].map(() => ({ key: 'brig', cells: [0, 1] })), lock: true },
+      { ships: [{ key: 'brig', cells: [0.5, 1] }], lock: true },
+      { ships: [{ key: 5, cells: [0, 1] }], lock: true },
+      { ships: [] },
+      null,
+    ]
+    for (const j of bad) expect((await status(() => parseFleetBody(j)))?.s).toBe(400)
+  })
+})
+
+describe('parseFireBody', () => {
+  it('accepts integers with seq >= 1', () => {
+    expect(parseFireBody({ cell: 7, seq: 1 })).toEqual({ cell: 7, seq: 1 })
+  })
+  it('rejects seq 0 and non-integers', async () => {
+    expect((await status(() => parseFireBody({ cell: 7, seq: 0 })))?.s).toBe(400)
+    expect((await status(() => parseFireBody({ cell: 'a', seq: 1 })))?.s).toBe(400)
+  })
+})
+
+describe('roomPath', () => {
+  it('routes by code length: 4 battleship, 5 sudoku, 6 caro', () => {
+    expect(roomPath('ABCD')).toBe('/b/ABCD')
+    expect(roomPath('ABCDE')).toBe('/s/ABCDE')
+    expect(roomPath('ABCDEF')).toBe('/r/ABCDEF')
   })
 })
