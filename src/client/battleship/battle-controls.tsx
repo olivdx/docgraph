@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { N } from '@/src/battleship/constants'
 
-const COLS = 'ABCDEF'
-export const coordName = (cell: number) => `${COLS[cell % 6]}${Math.floor(cell / 6) + 1}`
+const COLS = 'ABCDEFGHIJ'
+export const coordName = (cell: number) => `${COLS[cell % N]}${Math.floor(cell / N) + 1}`
 
 const ROUND =
   'grid size-[78px] flex-none place-items-center rounded-full font-display text-[17px] font-bold transition active:translate-y-1 disabled:translate-y-0'

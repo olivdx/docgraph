@@ -18,7 +18,9 @@ export type ModelName = (typeof MODEL_NAMES)[number]
 export type Models = Record<ModelName, THREE.Group>
 
 export const SHIP_MODEL: Record<ShipKey, ModelName> = {
+  ghost: 'ship-ghost',
   galleon: 'ship-pirate-large',
+  frigate: 'ship-pirate-medium',
   brig: 'ship-pirate-medium',
   sloop: 'ship-pirate-small',
 }

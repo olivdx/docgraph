@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type { Ship } from '@/src/battleship/types'
 import type { BattleMatchView } from '@/src/battleship/views'
 import { battleshipMatchChannel, battleshipRoomChannel } from '@/src/realtime/channels'
 import { BattleshipService } from '@/src/server/battleship-service'
@@ -11,13 +10,7 @@ import { mulberry } from '../tournament/helpers'
 
 const T0 = 1_800_000_000_000
 const tg = (i: number): TelegramUser => ({ id: `u${i}`, name: `User ${i}`, avatarUrl: null })
-const FLEET: Ship[] = [
-  { key: 'galleon', cells: [0, 1, 2] },
-  { key: 'brig', cells: [12, 18] },
-  { key: 'sloop', cells: [34, 35] },
-]
-const SHIP_CELLS = [0, 1, 2, 12, 18, 34, 35]
-const WATER = [5, 7, 9, 21, 23, 27, 29, 31, 33, 3]
+import { FLEET_A as FLEET, SHIP_CELLS, WATER } from '../battleship/helpers'
 
 function setup(elsewhere: string | null = null) {
   const clock = { t: T0 }
@@ -87,7 +80,7 @@ describe('BattleshipService', () => {
     expect(v.status).toBe('playing')
     const winner = v.turn!
     const used = { a: 0, b: 0 }
-    for (let i = 0; i < 30 && v.status === 'playing'; i++) {
+    for (let i = 0; i < 200 && v.status === 'playing'; i++) {
       s.clock.t += 1000
       const seat = v.turn!
       const user = seat === seat1 ? tg(1) : tg(2)
@@ -122,7 +115,7 @@ describe('BattleshipService', () => {
     const v = await s.svc.getMatch(code, id, tg(1))
     const opp = v.you === 'a' ? 'b' : 'a'
     expect(v.fleets[opp]).toEqual([])
-    expect(v.fleets[v.you!]).toHaveLength(3)
+    expect(v.fleets[v.you!]).toHaveLength(5)
   })
 
   it('notify: a shot rings the match channel only; finishing rings the room too', async () => {

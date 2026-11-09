@@ -109,7 +109,7 @@ export default function BattleshipHome() {
           <BackButton onClick={() => router.push('/')} label="Back to Games" />
           <div>
             <div className="font-display text-xl leading-tight text-white">Battleship Cup</div>
-            <div className="text-xs text-muted">6×6 sea · 3 ships · Bo1 knockout</div>
+            <div className="text-xs text-muted">10×10 sea · 5 ships · hit to fire again</div>
           </div>
         </div>
         <span className="lime-pill">FRIENDS ONLY</span>

@@ -181,7 +181,7 @@ export default function GamePicker() {
       <GameCard
         title="Battleship Cup"
         badge="KNOCKOUT CUP"
-        blurb="Hide your pirate fleet, then sink theirs. 6×6 sea, Bo1 knockout, friends only."
+        blurb="Hide your pirate fleet, then sink theirs. 10×10 sea, hit to fire again, friends only."
         statLabel="Format"
         statValue="Bo1"
         thumbClass="bg-[radial-gradient(circle_at_30%_25%,#0284c7,#082f49_85%)]"

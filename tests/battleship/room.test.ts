@@ -13,18 +13,12 @@ import {
   settleBattle,
   startBattle,
 } from '@/src/battleship/room'
-import type { BattleMatch, BattleRoom, Seat, Ship } from '@/src/battleship/types'
+import type { BattleMatch, BattleRoom, Seat } from '@/src/battleship/types'
 import { RoomError } from '@/src/tournament/types'
 import { mulberry, user } from '../tournament/helpers'
+import { FLEET_A, SHIP_CELLS, WATER } from './helpers'
 
 const T0 = 1_800_000_000_000
-const FLEET_A: Ship[] = [
-  { key: 'galleon', cells: [0, 1, 2] },
-  { key: 'brig', cells: [12, 18] },
-  { key: 'sloop', cells: [34, 35] },
-]
-const SHIP_CELLS = [0, 1, 2, 12, 18, 34, 35]
-const WATER = Array.from({ length: 36 }, (_, i) => i).filter((c) => !SHIP_CELLS.includes(c))
 
 function err(fn: () => unknown): string {
   try {
@@ -61,7 +55,7 @@ function toBattle(r: BattleRoom, id: string, t: number, rng = mulberry(5)): Batt
 function playOut(r: BattleRoom, id: string, winner: Seat, t: number): { r: BattleRoom; t: number } {
   const rng = mulberry(7)
   const used: Record<Seat, number> = { a: 0, b: 0 }
-  for (let i = 0; i < 40 && match(r, id).status === 'playing'; i++) {
+  for (let i = 0; i < 200 && match(r, id).status === 'playing'; i++) {
     const m = match(r, id)
     const seat = m.turn!
     const cell = seat === winner ? SHIP_CELLS[used[seat]++] : WATER[used[seat]++]
@@ -181,13 +175,13 @@ describe('ready and placement', () => {
     const m = r.matches[0]
     r = markBattleReady(r, m.id, m.a!, T0, mulberry(1), null)
     r = markBattleReady(r, m.id, m.b!, T0, mulberry(1), null)
-    r = saveFleet(r, m.id, m.a!, [{ key: 'galleon', cells: [14, 15, 16] }], false, T0 + 1000, mulberry(1), null)
+    r = saveFleet(r, m.id, m.a!, [{ key: 'galleon', cells: [44, 45, 46, 47] }], false, T0 + 1000, mulberry(1), null)
     r = settleBattle(r, null, T0 + 45_001, mulberry(1)).room
     const p = match(r, m.id)
     expect(p.status).toBe('playing')
-    expect(p.fleets.a).toHaveLength(3)
-    expect(p.fleets.a.find((s) => s.key === 'galleon')!.cells).toEqual([14, 15, 16])
-    expect(p.fleets.b).toHaveLength(3)
+    expect(p.fleets.a).toHaveLength(5)
+    expect(p.fleets.a.find((s) => s.key === 'galleon')!.cells).toEqual([44, 45, 46, 47])
+    expect(p.fleets.b).toHaveLength(5)
     expect(p.startedAt).toBe(T0 + 45_000)
   })
   it('saveFleet errors: bad_fleet, locked, not_placing', () => {
@@ -229,11 +223,33 @@ describe('battle', () => {
     expect(n.turn).toBe(other)
     expect(n.turnDeadlineAt).toBe(T0 + 2000 + 23_000)
   })
-  it('hit, then sunk; sinking every ship wins with fleet_sunk and finishes a 2-player cup', () => {
+  it('a hit keeps the turn, with a fresh clock and the 3 s grace', () => {
+    const { r, id, shooter } = started()
+    const m = match(r, id)
+    const next = fire(r, id, idOf(m, shooter), SHIP_CELLS[0], 1, T0 + 2000, mulberry(1), null)
+    const n = match(next, id)
+    expect(n.shots[shooter][0].result).toBe('hit')
+    expect(n.turn).toBe(shooter)
+    expect(n.turnDeadlineAt).toBe(T0 + 2000 + 23_000)
+    // and again after the next hit, until a miss passes the turn
+    const again = fire(next, id, idOf(m, shooter), SHIP_CELLS[1], 2, T0 + 3000, mulberry(1), null)
+    expect(match(again, id).turn).toBe(shooter)
+    const miss = fire(again, id, idOf(m, shooter), WATER[0], 3, T0 + 4000, mulberry(1), null)
+    expect(match(miss, id).turn).not.toBe(shooter)
+  })
+  it('hit, then sunk; sinking every ship in one streak wins with fleet_sunk and finishes a 2-player cup', () => {
     const { r, id, shooter } = started()
     const { r: done } = playOut(r, id, shooter, T0)
     const m = match(done, id)
-    expect(m.shots[shooter].map((s) => s.result)).toEqual(['hit', 'hit', 'sunk', 'hit', 'sunk', 'hit', 'sunk'])
+    expect(m.shots[shooter].map((s) => s.result)).toEqual([
+      'hit', 'hit', 'hit', 'hit', 'sunk',
+      'hit', 'hit', 'hit', 'sunk',
+      'hit', 'hit', 'sunk',
+      'hit', 'hit', 'sunk',
+      'hit', 'sunk',
+    ])
+    const other: Seat = shooter === 'a' ? 'b' : 'a'
+    expect(m.shots[other]).toHaveLength(0) // never got a turn
     expect(m.winner).toBe(shooter)
     expect(m.endReason).toBe('fleet_sunk')
     expect(done.status).toBe('finished')
@@ -251,7 +267,7 @@ describe('battle', () => {
     const { r, id, shooter, other } = started()
     const m = match(r, id)
     expect(err(() => fire(r, id, idOf(m, other), 0, 1, T0 + 1, mulberry(1), null))).toBe('not_your_turn')
-    for (const cell of [36, -1, 2.5]) {
+    for (const cell of [100, -1, 2.5]) {
       expect(err(() => fire(r, id, idOf(m, shooter), cell, 1, T0 + 1, mulberry(1), null))).toBe('out_of_bounds')
     }
     expect(err(() => fire(r, id, 'u9', 0, 1, T0 + 1, mulberry(1), null))).toBe('not_participant')
@@ -259,18 +275,17 @@ describe('battle', () => {
     r2 = fire(r2, id, idOf(m, other), WATER[0], 1, T0 + 2, mulberry(1), null)
     expect(err(() => fire(r2, id, idOf(m, shooter), WATER[0], 2, T0 + 3, mulberry(1), null))).toBe('occupied')
   })
-  it('turn timeout auto-fires and counts a missed turn', () => {
+  it('turn timeout auto-fires and counts a missed turn (a lucky hit keeps the turn)', () => {
     const { r, id, shooter, other } = started()
     const s = settleBattle(r, null, T0 + 20_001, mulberry(3)).room
     const m = match(s, id)
     expect(m.shots[shooter]).toHaveLength(1)
     expect(m.shots[shooter][0]).toMatchObject({ auto: true, seq: 1, at: T0 + 20_000 })
     expect(m.missedTurns[shooter]).toBe(1)
-    expect(m.turn).toBe(other)
+    expect(m.turn).toBe(m.shots[shooter][0].result === 'miss' ? other : shooter)
   })
   it('three missed turns in a row lose with afk; a manual shot resets the count', () => {
     const { r, id, shooter, other } = started()
-    // shooter misses turn 1 (auto at +20 s); other fires by hand; repeat → shooter at 2 misses
     let t = T0
     let room = r
     const handFire = (seat: Seat) => {
@@ -279,33 +294,30 @@ describe('battle', () => {
       const cell = WATER.find((c) => !used.has(c))!
       room = fire(room, id, idOf(m, seat), cell, m.shots[seat].length + 1, t + 1, mulberry(1), null)
     }
-    for (let k = 0; k < 2; k++) {
+    /** Lets the shooter's clock run out once (the other side misses by hand first if it's their turn). */
+    const timeout = () => {
+      if (match(room, id).turn === other) handFire(other)
       t = match(room, id).turnDeadlineAt!
       room = settleBattle(room, null, t + 1, mulberry(3)).room
-      handFire(other)
     }
+    timeout()
+    timeout()
     expect(match(room, id).missedTurns[shooter]).toBe(2)
+    if (match(room, id).turn === other) handFire(other)
     handFire(shooter) // a real shot resets the streak
     expect(match(room, id).missedTurns[shooter]).toBe(0)
-    handFire(other)
-    for (let k = 0; k < 3; k++) {
-      t = match(room, id).turnDeadlineAt!
-      room = settleBattle(room, null, t + 1, mulberry(3)).room
-      if (match(room, id).status !== 'playing') break
-      handFire(other)
-    }
+    for (let k = 0; k < 3 && match(room, id).status === 'playing'; k++) timeout()
     const m = match(room, id)
     expect(m.winner).toBe(other)
     expect(m.endReason).toBe('afk')
   })
   it('late fire after auto-shot is refused, not doubled', () => {
-    const { r, id, shooter, other } = started()
+    const { r, id, shooter } = started()
     const m = match(r, id)
     const late = fire(r, id, idOf(m, shooter), WATER[5], 1, T0 + 20_001, mulberry(3), null)
     const n = match(late, id)
     expect(n.shots[shooter]).toHaveLength(1)
     expect(n.shots[shooter][0].auto).toBe(true)
-    expect(n.turn).toBe(other)
   })
   it('disconnect during battle loses the match', () => {
     const { r, id } = started()
