@@ -7,6 +7,7 @@ import { ApiError, apiPost } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { initTelegram } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
+import { ShipThumb } from '@/src/client/battleship/ship-thumb'
 import type { BattleRoomView, BattleSummary } from '@/src/battleship/views'
 
 const COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#6c79ff', '#06b6d4']
@@ -116,12 +117,7 @@ export default function BattleshipHome() {
       </header>
 
       <div className="relative overflow-hidden rounded-[20px] border border-line bg-[radial-gradient(circle_at_30%_20%,#1d8fc0,#0b2a44_85%)] p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/assets/Previews/ship-pirate-large.png"
-          alt=""
-          className="pointer-events-none absolute -right-2 -bottom-3 w-32 [image-rendering:auto]"
-        />
+        <ShipThumb size={140} className="pointer-events-none absolute -right-3 -bottom-4" />
         <div className="max-w-[210px] font-display text-lg leading-tight text-white">Hide your fleet. Sink theirs.</div>
         <p className="mt-1.5 max-w-[210px] text-xs leading-snug text-sky-100/80">
           Create a cup, share the link in your chat, and fight a knockout bracket. Last captain afloat wins.

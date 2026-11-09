@@ -25,7 +25,8 @@ export const SHIP_MODEL: Record<ShipKey, ModelName> = {
   sloop: 'ship-pirate-small',
 }
 
-export const MODEL_BASE = '/assets/Models/GLB%20format/'
+import { MODEL_BASE } from './asset-paths'
+export { MODEL_BASE }
 
 let cache: Promise<Models> | null = null
 

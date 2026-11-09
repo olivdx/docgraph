@@ -6,6 +6,7 @@ import { apiGet } from '@/src/client/api'
 import { roomPath } from '@/src/client/routes'
 import { getStartParam, initTelegram } from '@/src/client/telegram'
 import { putPollCache, usePoll } from '@/src/client/use-poll'
+import { ShipThumb } from '@/src/client/battleship/ship-thumb'
 
 interface Me {
   user: { id: string; name: string; avatarUrl: string | null }
@@ -185,10 +186,7 @@ export default function GamePicker() {
         statLabel="Format"
         statValue="Bo1"
         thumbClass="bg-[radial-gradient(circle_at_30%_25%,#0284c7,#082f49_85%)]"
-        art={
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/assets/Previews/ship-pirate-large.png" alt="" className="w-[92px] drop-shadow-lg" />
-        }
+        art={<ShipThumb size={100} className="drop-shadow-lg" />}
         onClick={() => router.push('/battleship')}
       />
     </main>
