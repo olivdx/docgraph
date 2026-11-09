@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planBracket, roundName } from '@/src/tournament/bracket'
+import { planBracket, planByeBracket, roundName } from '@/src/tournament/bracket'
 import { randomCode } from '@/src/tournament/codes'
 import { BOT_NAMES, CODE_ALPHABET } from '@/src/tournament/constants'
 import type { Player } from '@/src/tournament/types'
@@ -100,5 +100,28 @@ describe('randomCode', () => {
       for (const ch of c) expect(CODE_ALPHABET).toContain(ch)
     }
     expect(CODE_ALPHABET).toBe('ABCDEFGHJKMNPQRSTUVWXYZ23456789')
+  })
+})
+
+describe('planByeBracket', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `p${i}`)
+  it.each([[2, 2, 1], [3, 4, 2], [5, 8, 3], [32, 32, 5]])('%i entrants → size %i, %i rounds', (n, size, rounds) => {
+    const p = planByeBracket(ids(n), mulberry(n))
+    expect(p.size).toBe(size)
+    expect(p.totalRounds).toBe(rounds)
+  })
+  it('byes fill the empty seats, each as the second half of its own round-1 pair', () => {
+    for (let n = 2; n <= 32; n++) {
+      const { order, size } = planByeBracket(ids(n), mulberry(n))
+      expect(order).toHaveLength(size)
+      expect(order.filter((x) => x === null)).toHaveLength(size - n)
+      for (let s = 0; s < size / 2; s++) expect(order[2 * s]).not.toBeNull()
+    }
+  })
+  it('places every entrant exactly once', () => {
+    for (let n = 2; n <= 32; n++) {
+      const { order } = planByeBracket(ids(n), mulberry(n + 100))
+      expect(order.filter((x) => x !== null).sort()).toEqual(ids(n).sort())
+    }
   })
 })
