@@ -39,12 +39,15 @@ export interface Placement {
 export function usePlacement(opts: {
   scene: BattleScene | null
   view: BattleMatchView
-  save: (ships: Ship[], lock: boolean) => Promise<void>
+  /** Resolves true when the server accepted the fleet. */
+  save: (ships: Ship[], lock: boolean) => Promise<boolean>
   toast: (msg: string) => void
 }): Placement {
   const { scene, view, save, toast } = opts
   const you = view.you!
-  const locked = view.locked[you]
+  // READY locks the fleet locally at once: edits made before the server answers would never be saved.
+  const [lockPending, setLockPending] = useState(false)
+  const locked = view.locked[you] || lockPending
   const [ships, setShips] = useState<Ship[]>(() => view.fleets[you])
   const [active, setActive] = useState<ShipKey | null>(() => nextUnplaced(view.fleets[you]))
   const [last, setLast] = useState<ShipKey | null>(null)
@@ -206,7 +209,10 @@ export function usePlacement(opts: {
     if (locked || ships.length !== FLEET.length) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     hideGhost()
-    void save(ships, true)
+    setLockPending(true)
+    void save(ships, true).then((accepted) => {
+      if (!accepted) setLockPending(false)
+    })
   }, [locked, ships, save, hideGhost])
 
   const select = useCallback(

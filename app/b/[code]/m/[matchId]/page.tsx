@@ -58,14 +58,11 @@ export default function BattleMatchPage() {
   const [override, setOverride] = useState<BattleMatchView | null>(null)
   const view = override && (!poll.data || override.serverNow > poll.data.serverNow) ? override : poll.data
 
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
+  // Element state (not refs): the canvas mounts only once the first view arrives, and the scene must
+  // be created then, even if the (cached) models finished loading long before.
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null)
-  const stageCallback = useCallback((el: HTMLDivElement | null) => {
-    stageRef.current = el
-    setStageEl(el)
-  }, [])
-  const { scene, error: sceneError } = useBattleScene(canvasRef, stageRef)
+  const { scene, error: sceneError } = useBattleScene(canvasEl, stageEl)
 
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -169,9 +166,7 @@ export default function BattleMatchPage() {
   }, [view, target, busy, post, scene])
 
   const save = useCallback(
-    async (ships: Ship[], lock: boolean) => {
-      await post('fleet', { ships, lock })
-    },
+    async (ships: Ship[], lock: boolean) => (await post('fleet', { ships, lock })) !== null,
     [post],
   )
 
@@ -257,9 +252,9 @@ export default function BattleMatchPage() {
 
       <MatchHud view={view} clockMs={clock} label={label} />
 
-      <div ref={stageCallback} className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-line bg-[#2b8db3]">
+      <div ref={setStageEl} className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-line bg-[#2b8db3]">
         <canvas
-          ref={canvasRef}
+          ref={setCanvasEl}
           className="block size-full touch-none"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -333,7 +328,7 @@ function PlacementLayer({
   view: BattleMatchView
   scene: ReturnType<typeof useBattleScene>['scene']
   stage: HTMLDivElement | null
-  save: (ships: Ship[], lock: boolean) => Promise<void>
+  save: (ships: Ship[], lock: boolean) => Promise<boolean>
   say: (text: string, bad?: boolean) => void
   bind: (h: Handlers | null) => void
 }) {

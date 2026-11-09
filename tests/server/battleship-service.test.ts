@@ -144,6 +144,24 @@ describe('BattleshipService', () => {
     expect(s.notes[0].channels).toContain(battleshipMatchChannel(code, id))
   })
 
+  it('parallel FIRE requests record exactly one shot', async () => {
+    const s = setup()
+    const { code, id } = await twoPlayerMatch(s)
+    const seat1 = (await s.svc.saveFleet(code, id, tg(1), FLEET, true)).you
+    const v = await s.svc.saveFleet(code, id, tg(2), FLEET, true)
+    const shooter = v.turn === seat1 ? tg(1) : tg(2)
+    s.clock.t += 1000
+    // Same seq twice (double tap) and a different cell with the same seq (two quick taps).
+    await Promise.all([
+      s.svc.fire(code, id, shooter, WATER[0], 1),
+      s.svc.fire(code, id, shooter, WATER[0], 1),
+      s.svc.fire(code, id, shooter, WATER[1], 1),
+    ])
+    const after = await s.svc.getMatch(code, id, shooter)
+    expect(after.shots[v.turn!]).toHaveLength(1)
+    expect(after.turn).not.toBe(v.turn)
+  })
+
   it('list shows open cups', async () => {
     const s = setup()
     const { code } = await s.svc.create(tg(1))
