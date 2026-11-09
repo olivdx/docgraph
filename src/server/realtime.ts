@@ -20,7 +20,13 @@ export const realtimeEnabled = () => !!process.env.ABLY_API_KEY
 
 import { CHANGED_EVENT, MOVE_EVENT, type MoveSignal } from '@/src/realtime/channels'
 
-export { caroMatchChannel, caroRoomChannel, sudokuChannel } from '@/src/realtime/channels'
+export {
+  battleshipMatchChannel,
+  battleshipRoomChannel,
+  caroMatchChannel,
+  caroRoomChannel,
+  sudokuChannel,
+} from '@/src/realtime/channels'
 
 /** Publishes a "changed" signal on each channel. Never throws: realtime is best-effort, polling covers misses. */
 export async function publishChanged(channels: string[], version: number): Promise<void> {
@@ -53,6 +59,6 @@ export async function createTokenRequest(userId: string): Promise<Ably.TokenRequ
   return c.auth.createTokenRequest({
     clientId: userId,
     ttl: 60 * 60 * 1000,
-    capability: { 'caro:*': ['subscribe'], 'sudoku:*': ['subscribe'] },
+    capability: { 'caro:*': ['subscribe'], 'sudoku:*': ['subscribe'], 'battleship:*': ['subscribe'] },
   })
 }

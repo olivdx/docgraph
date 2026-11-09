@@ -7,6 +7,9 @@ import { createGauntletLearning } from './gauntlet-learning'
 import { MongoGauntletBookStore } from './gauntlet-book-store'
 import { MongoPresenceStore, MongoRoomStore } from './stores'
 import { SudokuService } from './sudoku-service'
+import { BattleshipService } from './battleship-service'
+import { MongoBattleStore } from './battleship-store'
+import type { Ship } from '@/src/battleship/types'
 import { MongoSudokuStore } from './sudoku-store'
 import { isDifficulty, type Difficulty } from '@/src/sudoku/types'
 import { isBotLevel, isMatchFormat, RoomError, type BotLevel, type MatchFormat } from '@/src/tournament/types'
@@ -35,22 +38,34 @@ function notifyMove(channel: string, signal: MoveSignal): void {
 interface Services {
   caro: RoomService
   sudoku: SudokuService
+  battleship: BattleshipService
 }
 let servicesPromise: Promise<Services> | null = null
 
-/** Lazy singleton: never touches Mongo until the first request. Each game checks the other for an active room. */
+/** First active room code among the given games, checked in order. */
+async function firstActive(userId: string, checks: ((id: string) => Promise<string | null>)[]): Promise<string | null> {
+  for (const check of checks) {
+    const code = await check(userId)
+    if (code) return code
+  }
+  return null
+}
+
+/** Lazy singleton: never touches Mongo until the first request. Each game checks the others for an active room. */
 function getServices(): Promise<Services> {
   servicesPromise ??= getDb()
     .then((db) => {
       const out = {} as Services
       const learning = createGauntletLearning(new MongoGauntletBookStore(db))
+      const presence = new MongoPresenceStore(db)
       out.caro = new RoomService({
         rooms: new MongoRoomStore(db),
-        presence: new MongoPresenceStore(db),
+        presence,
         now: Date.now,
         rng: Math.random,
         inviteUrl: (code) => buildInviteUrl(code),
-        activeElsewhere: (userId) => out.sudoku.activeCode(userId),
+        activeElsewhere: (userId) =>
+          firstActive(userId, [(u) => out.sudoku.activeCode(u), (u) => out.battleship.activeCode(u)]),
         notify,
         notifyMove,
         learning,
@@ -62,7 +77,17 @@ function getServices(): Promise<Services> {
         now: Date.now,
         rng: Math.random,
         inviteUrl: (code) => buildInviteUrl(code),
-        activeElsewhere: (userId) => out.caro.activeCode(userId),
+        activeElsewhere: (userId) =>
+          firstActive(userId, [(u) => out.caro.activeCode(u), (u) => out.battleship.activeCode(u)]),
+        notify,
+      })
+      out.battleship = new BattleshipService({
+        rooms: new MongoBattleStore(db),
+        presence, // Battleship codes are 4 chars, so presence keys never collide with Caro's
+        now: Date.now,
+        rng: Math.random,
+        inviteUrl: (code) => buildInviteUrl(code),
+        activeElsewhere: (userId) => firstActive(userId, [(u) => out.caro.activeCode(u), (u) => out.sudoku.activeCode(u)]),
         notify,
       })
       return out
@@ -76,6 +101,7 @@ function getServices(): Promise<Services> {
 
 export const getService = async (): Promise<RoomService> => (await getServices()).caro
 export const getSudokuService = async (): Promise<SudokuService> => (await getServices()).sudoku
+export const getBattleshipService = async (): Promise<BattleshipService> => (await getServices()).battleship
 
 const STATUS: Record<string, number> = {
   not_found: 404,
@@ -158,6 +184,25 @@ export function parseEntryBody(json: unknown): { cell: number; digit: number; se
   const [c, d, n] = [cell as number, digit as number, seq as number]
   if (c < 0 || c > 80 || d < 1 || d > 9 || n < 1) throw badRequest()
   return { cell: c, digit: d, seq: n }
+}
+
+/** Shape check only; validateFleet does the game rules. */
+export function parseFleetBody(json: unknown): { ships: Ship[]; lock: boolean } {
+  if (!isObject(json) || !Array.isArray(json.ships) || typeof json.lock !== 'boolean') throw badRequest()
+  if (json.ships.length > 3) throw badRequest()
+  const ships = json.ships.map((s: unknown) => {
+    if (!isObject(s) || typeof s.key !== 'string' || !Array.isArray(s.cells)) throw badRequest()
+    if (s.cells.length > 3 || !s.cells.every((c: unknown) => Number.isInteger(c))) throw badRequest()
+    return { key: s.key as Ship['key'], cells: s.cells as number[] }
+  })
+  return { ships, lock: json.lock }
+}
+
+export function parseFireBody(json: unknown): { cell: number; seq: number } {
+  if (!isObject(json)) throw badRequest()
+  const { cell, seq } = json
+  if (!Number.isInteger(cell) || !Number.isInteger(seq) || (seq as number) < 1) throw badRequest()
+  return { cell: cell as number, seq: seq as number }
 }
 
 export const codeOf = (c: string) => c.toUpperCase()

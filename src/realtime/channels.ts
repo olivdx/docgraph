@@ -24,3 +24,5 @@ export interface MoveSignal {
 export const caroRoomChannel = (code: string) => `caro:${code.toUpperCase()}`
 export const caroMatchChannel = (code: string, matchId: string) => `caro:${code.toUpperCase()}:${matchId}`
 export const sudokuChannel = (code: string) => `sudoku:${code.toUpperCase()}`
+export const battleshipRoomChannel = (code: string) => `battleship:${code.toUpperCase()}`
+export const battleshipMatchChannel = (code: string, matchId: string) => `battleship:${code.toUpperCase()}:${matchId}`

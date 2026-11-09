@@ -9,11 +9,15 @@ import { putPollCache, usePoll } from '@/src/client/use-poll'
 
 interface Me {
   user: { id: string; name: string; avatarUrl: string | null }
-  active: { game: 'caro' | 'sudoku'; code: string; matchId: string | null } | null
+  active: { game: 'caro' | 'sudoku' | 'battleship'; code: string; matchId: string | null } | null
 }
 
 const activePath = (a: NonNullable<Me['active']>) =>
-  a.game === 'caro' && a.matchId ? `/r/${a.code}/m/${a.matchId}` : roomPath(a.code)
+  a.game === 'caro' && a.matchId
+    ? `/r/${a.code}/m/${a.matchId}`
+    : a.game === 'battleship' && a.matchId
+      ? `/b/${a.code}/m/${a.matchId}`
+      : roomPath(a.code)
 
 /** True only the first time this session (sessionStorage flag). */
 function firstBoot(): boolean {
@@ -111,7 +115,7 @@ export default function GamePicker() {
             {active ? `YOUR ${active.game.toUpperCase()} ROOM IS LIVE!` : 'GAME CUP TOURNAMENT INVITES YOU!'}
           </div>
           <div className="mt-2">
-            <span className="lime-pill">● {active ? `ACTIVE · ${active.code}` : '2 GAMES · INSTANT PLAY'}</span>
+            <span className="lime-pill">● {active ? `ACTIVE · ${active.code}` : '3 GAMES · INSTANT PLAY'}</span>
           </div>
           <button
             onClick={() => router.push(active ? activePath(active) : '/caro')}
@@ -173,6 +177,19 @@ export default function GamePicker() {
           </div>
         }
         onClick={() => router.push('/sudoku')}
+      />
+      <GameCard
+        title="Battleship Cup"
+        badge="KNOCKOUT CUP"
+        blurb="Hide your pirate fleet, then sink theirs. 6×6 sea, Bo1 knockout, friends only."
+        statLabel="Format"
+        statValue="Bo1"
+        thumbClass="bg-[radial-gradient(circle_at_30%_25%,#0284c7,#082f49_85%)]"
+        art={
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/assets/Previews/ship-pirate-large.png" alt="" className="w-[92px] drop-shadow-lg" />
+        }
+        onClick={() => router.push('/battleship')}
       />
     </main>
   )

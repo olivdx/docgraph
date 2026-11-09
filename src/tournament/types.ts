@@ -93,6 +93,7 @@ export type ListedRoom = Omit<Room, 'matches'> & { matches: Omit<Match, 'moves'>
 export type RoomErrorCode =
   | 'not_found' | 'not_lobby' | 'full' | 'not_host' | 'host_must_cancel' | 'too_few_players' | 'too_many_players'
   | 'not_participant' | 'not_playing' | 'not_your_turn' | 'occupied' | 'out_of_bounds' | 'already_active' | 'conflict'
+  | 'bad_fleet' | 'not_placing' | 'locked'
 
 export class RoomError extends Error {
   constructor(public code: RoomErrorCode, public extra?: Record<string, unknown>) {
