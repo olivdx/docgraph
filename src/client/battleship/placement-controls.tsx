@@ -268,8 +268,8 @@ export function ShipTray({ p }: { p: Placement }) {
             type="button"
             disabled={p.locked}
             onClick={() => p.select(f.key)}
-            className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl border bg-[#0b1f33]/80 px-0.5 py-2 text-[11px] leading-tight font-bold text-white disabled:opacity-60 ${
-              p.active === f.key ? 'border-amber-400 shadow-[0_0_0_2px_rgba(255,182,39,.45)]' : 'border-white/25'
+            className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl border bg-slate-950/35 px-0.5 py-2 text-[11px] leading-tight font-bold text-white backdrop-blur-md disabled:opacity-60 ${
+              p.active === f.key ? 'border-amber-400 shadow-[0_0_0_2px_rgba(255,182,39,.45)]' : 'border-white/20'
             } ${placed ? 'opacity-60' : ''}`}
           >
             <span className="flex gap-0.5">

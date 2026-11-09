@@ -47,6 +47,8 @@ export function loadModels(base = MODEL_BASE): Promise<Models> {
 export interface FitOpts {
   /** Ship length in cells: the long axis is turned onto Z and scaled to this. */
   len?: number
+  /** Maximum ship width across the beam (local X) when `len` is set; defaults to 0.88 of a cell. */
+  maxWidth?: number
   /** Largest horizontal size. */
   maxXZ?: number
   height?: number
@@ -71,8 +73,14 @@ export function fit(src: THREE.Object3D, opts: FitOpts): THREE.Group {
     o.rotation.y = Math.PI / 2
     measure()
   }
-  const s = opts.len ? opts.len / size.z : opts.maxXZ ? opts.maxXZ / Math.max(size.x, size.z) : opts.height! / size.y
-  o.scale.multiplyScalar(s)
+  if (opts.len) {
+    const sz = opts.len / size.z
+    const sx = Math.min(sz, (opts.maxWidth ?? 0.88) / size.x)
+    o.scale.set(o.scale.x * sx, o.scale.y * sz, o.scale.z * sz)
+  } else {
+    const s = opts.maxXZ ? opts.maxXZ / Math.max(size.x, size.z) : opts.height! / size.y
+    o.scale.multiplyScalar(s)
+  }
   measure()
   o.position.x -= ctr.x
   o.position.z -= ctr.z

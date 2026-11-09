@@ -60,7 +60,7 @@ export function MatchHud({ view, clockMs, label }: { view: BattleMatchView; cloc
   const theirTurn = view.status === 'playing' && view.turn !== null && view.turn !== view.you
   const secs = clockMs === null ? null : Math.ceil(clockMs / 1000)
   return (
-    <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[14px] border border-line bg-panel px-2.5 py-2">
+    <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[14px] border border-white/15 bg-white/10 px-2.5 py-2 backdrop-blur-md">
       <div className="flex min-w-0 items-center gap-2">
         <Avatar name={p1?.name ?? '?'} url={p1?.avatarUrl ?? null} />
         <div className="flex min-w-0 flex-col gap-1">
@@ -70,7 +70,7 @@ export function MatchHud({ view, clockMs, label }: { view: BattleMatchView; cloc
       </div>
       <div className="flex flex-col items-center gap-1">
         <span
-          className={`rounded-full bg-bg px-2.5 py-1 font-display text-[11px] whitespace-nowrap ${
+          className={`rounded-full bg-black/25 px-2.5 py-1 font-display text-[11px] whitespace-nowrap ${
             yourTurn ? 'text-amber-300' : theirTurn ? 'text-o' : 'text-muted'
           }`}
         >

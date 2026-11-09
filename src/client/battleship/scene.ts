@@ -79,7 +79,7 @@ interface ShipObj {
 export class BattleScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
-  private camera = new THREE.PerspectiveCamera(42, 1, 0.1, N * 20)
+  private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, N * 20)
   private waterMat: THREE.ShaderMaterial
   private clock = new THREE.Clock()
   private raf = 0
@@ -104,8 +104,6 @@ export class BattleScene {
   private ghostTiles: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = []
 
   private camTarget = new THREE.Vector3(BOARD_X.me, 0, 0)
-  private camDir = new THREE.Vector3(0, 1, 0.78).normalize()
-  private camDist = 12
   private shake = 0
   private ray = new THREE.Raycaster()
 
@@ -115,9 +113,9 @@ export class BattleScene {
   ) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.camera.up.set(0, 0, -1)
     this.scene.background = new THREE.Color('#7cc8ea')
-    this.scene.fog = new THREE.Fog('#7cc8ea', N * 4, N * 9)
-    this.scene.add(new THREE.HemisphereLight(0xe6f6ff, 0x2a6f8f, 1.7))
+    this.scene.add(new THREE.HemisphereLight(0xe6f6ff, 0x2a6f8f, 1.85))
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.4)
     sun.position.set(6, 12, 7)
     this.scene.add(sun)
@@ -150,12 +148,16 @@ export class BattleScene {
   resize(width: number, height: number): void {
     if (width <= 0 || height <= 0) return
     this.renderer.setSize(width, height, false)
-    this.camera.aspect = width / height
+    const aspect = width / height
+    const minW = N + 1.8
+    const minH = N + 4.4
+    const halfH = Math.max(minH / 2, minW / (2 * aspect))
+    const halfW = halfH * aspect
+    this.camera.left = -halfW
+    this.camera.right = halfW
+    this.camera.top = halfH
+    this.camera.bottom = -halfH
     this.camera.updateProjectionMatrix()
-    const v = THREE.MathUtils.degToRad(this.camera.fov)
-    const hf = 2 * Math.atan(Math.tan(v / 2) * this.camera.aspect)
-    // wide enough for the sea and its labels, tall enough for both cannons
-    this.camDist = Math.max((N / 2 + 1.3) / Math.tan(hf / 2), (N / 2 + 2.4) / Math.tan(v / 2)) * 1.05
   }
 
   dispose(): void {
@@ -305,7 +307,7 @@ export class BattleScene {
     const a = this.cellPos(board, ship.cells[0])
     const b = this.cellPos(board, ship.cells[ship.cells.length - 1])
     const v = a.add(b).multiplyScalar(0.5)
-    v.y = 1.05
+    v.z -= 0.72
     this.camera.updateMatrixWorld()
     v.project(this.camera)
     if (v.z > 1) return null
@@ -349,7 +351,7 @@ export class BattleScene {
 
     const tint = new THREE.Mesh(
       new THREE.PlaneGeometry(N, N),
-      new THREE.MeshBasicMaterial({ color: key === 'enemy' ? '#ffffff' : '#bfe9ff', transparent: true, opacity: 0.08, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: key === 'enemy' ? 0.05 : 0.08, depthWrite: false }),
     )
     tint.rotation.x = -Math.PI / 2
     tint.position.y = 0.015
@@ -362,25 +364,14 @@ export class BattleScene {
     }
     const lg = new THREE.BufferGeometry()
     lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    root.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45 })))
+    root.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.32 })))
 
-    const wood = new THREE.MeshStandardMaterial({ color: key === 'enemy' ? '#7a4b2a' : '#a0703c', roughness: 0.9 })
-    for (const [x, z, w, d] of [
-      [0, -N / 2, N + 0.24, 0.14],
-      [0, N / 2, N + 0.24, 0.14],
-      [-N / 2, 0, 0.14, N],
-      [N / 2, 0, 0.14, N],
-    ]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), wood)
-      b.position.set(x, 0.04, z)
-      root.add(b)
-    }
     for (let i = 0; i < N; i++) {
       const a = this.textSprite(COLS[i])
-      a.position.set(i - (N - 1) / 2, 0.3, -N / 2 - 0.45)
+      a.position.set(i - (N - 1) / 2, 0.3, -N / 2 - 0.5)
       root.add(a)
       const n = this.textSprite(String(i + 1))
-      n.position.set(-N / 2 - 0.45, 0.3, i - (N - 1) / 2)
+      n.position.set(-N / 2 - 0.5, 0.3, i - (N - 1) / 2)
       root.add(n)
     }
     this.decorate(key, root)
@@ -825,13 +816,14 @@ export class BattleScene {
       d = Math.atan2(Math.sin(d), Math.cos(d))
       c.yaw.rotation.y += d * Math.min(1, dt * 7)
     }
-    this.camera.position.copy(this.camTarget).addScaledVector(this.camDir, this.camDist)
+    this.camera.position.set(this.camTarget.x, 40, this.camTarget.z)
     if (this.shake > 0.002) {
       this.camera.position.x += (Math.random() - 0.5) * this.shake
-      this.camera.position.y += (Math.random() - 0.5) * this.shake
+      this.camera.position.z += (Math.random() - 0.5) * this.shake
       this.shake *= Math.pow(0.01, dt)
     }
-    this.camera.lookAt(this.camTarget.x, 0, this.camTarget.z + 0.35)
+    this.camera.up.set(0, 0, -1)
+    this.camera.lookAt(this.camTarget.x, 0, this.camTarget.z)
     this.renderer.render(this.scene, this.camera)
     this.raf = requestAnimationFrame(this.loop)
   }

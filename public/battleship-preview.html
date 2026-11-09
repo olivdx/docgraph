@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Battleship — Hình chiếu bằng (Review)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #121521;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .app {
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100dvh;
+      width: 100%;
+      max-width: 448px;
+      padding: 10px 12px 12px;
+    }
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.10);
+      padding: 8px 10px;
+      backdrop-filter: blur(12px);
+    }
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .player.foe {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 13px;
+      background: #0369a1;
+      color: #fff;
+      flex: none;
+    }
+    .avatar.foe { background: rgba(136, 19, 55, 0.7); }
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .name {
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pips {
+      display: flex;
+      gap: 3px;
+    }
+    .player.foe .pips { justify-content: flex-end; }
+    .pip-ship { display: flex; gap: 1px; }
+    .pip-ship i {
+      display: block;
+      width: 4px;
+      height: 9px;
+      border-radius: 1px;
+      background: #f8fafc;
+    }
+    .badge {
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fcd34d;
+      white-space: nowrap;
+    }
+    .stage {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(43, 141, 179, 0.4);
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .tray {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      display: flex;
+      gap: 8px;
+    }
+    .tray button {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(2, 6, 23, 0.35);
+      padding: 8px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+    }
+    .tray button[aria-pressed="true"] {
+      border-color: #fbbf24;
+      box-shadow: 0 0 0 2px rgba(255, 182, 39, 0.45);
+    }
+    .tray .dots { display: flex; gap: 2px; }
+    .tray .dots i {
+      display: block;
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: #34d399;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    .tool {
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.10);
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+    }
+    .ready {
+      width: 78px;
+      height: 78px;
+      border-radius: 999px;
+      border: 0;
+      font-size: 16px;
+      font-weight: 800;
+      background: radial-gradient(circle at 50% 35%, #8af0b6, #4fd18b 55%, #2a9a5e);
+      color: #06301a;
+      box-shadow: 0 6px 0 #1d6b41, 0 10px 22px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+    }
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #121521;
+      color: #8b95b0;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hud">
+      <div class="player">
+        <div class="avatar">Y</div>
+        <div class="meta">
+          <span class="name">You</span>
+          <div class="pips">
+            <span class="pip-ship"><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i></span>
+          </div>
+        </div>
+      </div>
+      <span class="badge" id="board-label">Your Fleet</span>
+      <div class="player foe">
+        <div class="avatar foe">E</div>
+        <div class="meta">
+          <span class="name">Opponent</span>
+          <div class="pips">
+            <span class="pip-ship"><i></i><i></i><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i><i></i></span>
+            <span class="pip-ship"><i></i><i></i></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="stage" id="stage">
+      <canvas id="c"></canvas>
+      <div class="tray" id="tray"></div>
+      <div id="loading">Loading the sea…</div>
+    </div>
+
+    <div class="controls">
+      <button type="button" class="tool" id="btn-rotate">↻ Rotate</button>
+      <button type="button" class="ready" id="btn-board">SEA</button>
+      <button type="button" class="tool" id="btn-random">Random</button>
+    </div>
+  </main>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three'
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+
+    const N = 10
+    const COLS = 'ABCDEFGHIJ'
+    const BOARD_X = { me: -(N + 1), enemy: N + 1 }
+    const out = (v) => v + Math.sign(v) * (N / 2 - 3)
+    const ASSET = './assets/Models/GLB%20format/'
+
+    const FLEET = [
+      { key: 'ghost', name: 'Ghost Ship', file: 'ship-ghost', len: 5 },
+      { key: 'galleon', name: 'Galleon', file: 'ship-pirate-large', len: 4 },
+      { key: 'frigate', name: 'Frigate', file: 'ship-pirate-medium', len: 3 },
+      { key: 'brig', name: 'Brig', file: 'ship-pirate-medium', len: 3 },
+      { key: 'sloop', name: 'Sloop', file: 'ship-pirate-small', len: 2 },
+    ]
+
+    const MODEL_NAMES = [
+      'ship-pirate-large', 'ship-pirate-medium', 'ship-pirate-small',
+      'cannon-mobile', 'flag-pirate', 'patch-sand-foliage', 'tower-complete-small',
+      'flag-pirate-high', 'ship-wreck', 'rocks-sand-a', 'rocks-sand-b', 'rocks-sand-c',
+      'rocks-c', 'crate', 'bottle', 'palm-detailed-bend', 'palm-detailed-straight',
+      'crate-bottles', 'chest', 'grass-plant', 'tower-watch',
+      'structure-platform-dock-small', 'boat-row-small', 'ship-ghost', 'rocks-b',
+      'palm-bend', 'patch-sand', 'barrel',
+    ]
+
+    let ships = [
+      { key: 'ghost', cells: [82, 83, 84, 85, 86] },
+      { key: 'galleon', cells: [30, 40, 50, 60] },
+      { key: 'frigate', cells: [13, 14, 15] },
+      { key: 'brig', cells: [46, 47, 48] },
+      { key: 'sloop', cells: [18, 28] },
+    ]
+    let selectedKey = 'ghost'
+    let currentBoard = 'me'
+
+    const stage = document.getElementById('stage')
+    const canvas = document.getElementById('c')
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color('#7cc8ea')
+    scene.add(new THREE.HemisphereLight(0xe6f6ff, 0x2a6f8f, 1.85))
+    const sun = new THREE.DirectionalLight(0xfff4e0, 2.4)
+    sun.position.set(6, 12, 7)
+    scene.add(sun)
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, N * 20)
+    camera.up.set(0, 0, -1)
+    const camTarget = new THREE.Vector3(BOARD_X.me, 0, 0)
+
+    const waterMat = new THREE.ShaderMaterial({
+      uniforms: { t: { value: 0 } },
+      vertexShader: `varying vec2 vp; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vp = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `uniform float t; varying vec2 vp;
+        void main(){
+          vec3 base = vec3(.20, .62, .80);
+          float w = sin(vp.x*.45 + t*.5) * sin(vp.y*.40 - t*.4);
+          gl_FragColor = vec4(base + w * .025, 1.0);
+        }`,
+    })
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(N * 24, N * 24), waterMat)
+    water.rotation.x = -Math.PI / 2
+    scene.add(water)
+
+    function fit(src, opts) {
+      const o = src.clone(true)
+      const wrap = new THREE.Group()
+      wrap.add(o)
+      const box = new THREE.Box3()
+      const size = new THREE.Vector3()
+      const ctr = new THREE.Vector3()
+      const measure = () => {
+        o.updateMatrixWorld(true)
+        box.setFromObject(o)
+        box.getSize(size)
+        box.getCenter(ctr)
+      }
+      measure()
+      if (opts.len && size.x > size.z) {
+        o.rotation.y = Math.PI / 2
+        measure()
+      }
+      if (opts.len) {
+        const sz = opts.len / size.z
+        const sx = Math.min(sz, (opts.maxWidth ?? 0.88) / size.x)
+        o.scale.set(o.scale.x * sx, o.scale.y * sz, o.scale.z * sz)
+      } else {
+        const s = opts.maxXZ ? opts.maxXZ / Math.max(size.x, size.z) : opts.height / size.y
+        o.scale.multiplyScalar(s)
+      }
+      measure()
+      o.position.x -= ctr.x
+      o.position.z -= ctr.z
+      o.position.y -= box.min.y
+      wrap.userData.h = size.y
+      return wrap
+    }
+
+    function textSprite(txt) {
+      const cv = document.createElement('canvas')
+      cv.width = cv.height = 64
+      const g = cv.getContext('2d')
+      g.font = '700 40px system-ui, sans-serif'
+      g.textAlign = 'center'
+      g.textBaseline = 'middle'
+      g.fillStyle = 'rgba(11,31,51,.55)'
+      g.fillText(txt, 33, 35)
+      g.fillStyle = '#ffffff'
+      g.fillText(txt, 32, 33)
+      const tex = new THREE.CanvasTexture(cv)
+      tex.colorSpace = THREE.SRGBColorSpace
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }))
+      sp.scale.setScalar(0.42)
+      return sp
+    }
+
+    const rc = (i) => [Math.floor(i / N), i % N]
+    const cellPos = (board, i) => {
+      const [r, c] = rc(i)
+      return new THREE.Vector3(BOARD_X[board] + (c - (N - 1) / 2), 0, r - (N - 1) / 2)
+    }
+    const isHoriz = (cells) => cells.length < 2 || cells[1] - cells[0] === 1
+
+    const loader = new GLTFLoader()
+    const models = Object.fromEntries(
+      await Promise.all(MODEL_NAMES.map(async (n) => [n, (await loader.loadAsync(`${ASSET}${n}.glb`)).scene])),
+    )
+
+    const bobbers = []
+    const foamRings = []
+    const dyn = { me: new THREE.Group(), enemy: new THREE.Group() }
+    scene.add(dyn.me, dyn.enemy)
+
+    function place(parent, name, opt, x, z, { y = 0, ry = 0, bob = false, tilt = 0 } = {}) {
+      const o = fit(models[name], opt)
+      o.position.set(x, y, z)
+      o.rotation.y = ry
+      if (bob) {
+        o.userData.baseY = y
+        o.userData.bob = Math.random() * 6
+        o.userData.rz = tilt
+        bobbers.push(o)
+      }
+      parent.add(o)
+      return o
+    }
+
+    function foam(parent, x, z, r) {
+      const m = new THREE.Mesh(
+        new THREE.RingGeometry(r, r + 0.1, 40),
+        new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false }),
+      )
+      m.rotation.x = -Math.PI / 2
+      m.position.set(x, 0.012, z)
+      parent.add(m)
+      foamRings.push({ m, ph: Math.random() * 6 })
+    }
+
+    function buildBoard(key) {
+      const root = new THREE.Group()
+      root.position.x = BOARD_X[key]
+      scene.add(root)
+
+      const tint = new THREE.Mesh(
+        new THREE.PlaneGeometry(N, N),
+        new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: key === 'enemy' ? 0.05 : 0.08, depthWrite: false }),
+      )
+      tint.rotation.x = -Math.PI / 2
+      tint.position.y = 0.015
+      root.add(tint)
+
+      const pts = []
+      for (let i = 0; i <= N; i++) {
+        const v = i - N / 2
+        pts.push(v, 0.02, -N / 2, v, 0.02, N / 2, -N / 2, 0.02, v, N / 2, 0.02, v)
+      }
+      const lg = new THREE.BufferGeometry()
+      lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+      root.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.32 })))
+
+      for (let i = 0; i < N; i++) {
+        const a = textSprite(COLS[i])
+        a.position.set(i - (N - 1) / 2, 0.3, -N / 2 - 0.5)
+        root.add(a)
+        const n = textSprite(String(i + 1))
+        n.position.set(-N / 2 - 0.5, 0.3, i - (N - 1) / 2)
+        root.add(n)
+      }
+
+      if (key === 'enemy') {
+        foam(root, out(-3.7), out(-4.4), 1.25)
+        place(root, 'patch-sand-foliage', { maxXZ: 2.4 }, out(-3.7), out(-4.4), { y: -0.05 })
+        place(root, 'tower-complete-small', { height: 1.9 }, out(-3.95), out(-4.6), { ry: 0.4 })
+        place(root, 'flag-pirate-high', { height: 1.4 }, out(-3.05), out(-4.05), { ry: -0.5 })
+        foam(root, out(3.8), out(-4.3), 0.95)
+        place(root, 'ship-wreck', { maxXZ: 1.8 }, out(3.8), out(-4.3), { y: -0.12, ry: 2.2 })
+        place(root, 'rocks-sand-a', { maxXZ: 0.9 }, out(4.5), out(-3.4), { y: -0.05 })
+        foam(root, out(3.6), out(4.4), 0.9)
+        place(root, 'patch-sand', { maxXZ: 1.6 }, out(3.6), out(4.4), { y: -0.05 })
+        place(root, 'palm-detailed-bend', { height: 1.7 }, out(3.6), out(4.4), { ry: 2.5 })
+        foam(root, out(-3.6), out(4.4), 0.6)
+        place(root, 'rocks-sand-b', { maxXZ: 1 }, out(-3.6), out(4.4), { y: -0.05 })
+      } else {
+        foam(root, out(-3.7), out(4.4), 1.2)
+        place(root, 'patch-sand', { maxXZ: 2.3 }, out(-3.7), out(4.4), { y: -0.05 })
+        place(root, 'tower-watch', { height: 1.7 }, out(-3.95), out(4.6))
+        place(root, 'structure-platform-dock-small', { maxXZ: 1 }, out(-2.55), out(4.15), { y: -0.02, ry: Math.PI / 2 })
+        place(root, 'boat-row-small', { maxXZ: 0.8 }, out(-2.2), out(4.95), { y: -0.08, ry: 0.3, bob: true })
+        foam(root, out(3.7), out(4.4), 1.1)
+        place(root, 'patch-sand-foliage', { maxXZ: 2.1 }, out(3.7), out(4.4), { y: -0.05 })
+        place(root, 'palm-detailed-straight', { height: 1.9 }, out(3.95), out(4.6))
+        place(root, 'chest', { maxXZ: 0.45 }, out(3.2), out(4.1), { ry: -0.6 })
+        foam(root, out(3.8), out(-4.4), 0.8)
+        place(root, 'rocks-sand-a', { maxXZ: 1.2 }, out(3.8), out(-4.4), { y: -0.05 })
+        foam(root, out(-3.8), out(-4.4), 1)
+        place(root, 'patch-sand', { maxXZ: 1.6 }, out(-3.8), out(-4.4), { y: -0.05 })
+        place(root, 'palm-bend', { height: 1.6 }, out(-3.8), out(-4.4), { ry: 1 })
+      }
+    }
+
+    function buildCannon(key) {
+      const mine = key === 'enemy'
+      const base = new THREE.Group()
+      base.position.set(BOARD_X[key], 0, mine ? N / 2 + 1.25 : -(N / 2 + 1.25))
+      const island = fit(models['patch-sand'], { maxXZ: 2.2 })
+      island.position.y = -0.06
+      base.add(island)
+      const yaw = new THREE.Group()
+      yaw.position.y = 0.06
+      base.add(yaw)
+      yaw.add(fit(models['cannon-mobile'], { maxXZ: 0.95 }))
+      if (!mine) {
+        const flag = fit(models['flag-pirate'], { height: 1.1 })
+        flag.position.set(0.75, 0, -0.35)
+        base.add(flag)
+      }
+      yaw.rotation.y = mine ? Math.PI : 0
+      scene.add(base)
+    }
+
+    buildBoard('me')
+    buildBoard('enemy')
+    buildCannon('me')
+    buildCannon('enemy')
+
+    function renderFleet() {
+      dyn.me.clear()
+      for (const ship of ships) {
+        const def = FLEET.find((f) => f.key === ship.key)
+        const w = fit(models[def.file], { len: def.len * 0.95 })
+        w.position.copy(cellPos('me', ship.cells[0])).add(cellPos('me', ship.cells[ship.cells.length - 1])).multiplyScalar(0.5)
+        w.userData.baseY = -w.userData.h * 0.18
+        w.position.y = w.userData.baseY
+        w.rotation.y = isHoriz(ship.cells) ? Math.PI / 2 : 0
+        w.userData.bob = Math.random() * 6
+        dyn.me.add(w)
+        bobbers.push(w)
+      }
+    }
+
+    function centeredCells(len, center, horiz) {
+      const [r, c] = rc(center)
+      const half = Math.floor((len - 1) / 2)
+      if (horiz) {
+        const c0 = Math.max(0, Math.min(N - len, c - half))
+        return Array.from({ length: len }, (_, k) => r * N + c0 + k)
+      }
+      const r0 = Math.max(0, Math.min(N - len, r - half))
+      return Array.from({ length: len }, (_, k) => (r0 + k) * N + c)
+    }
+
+    const overlaps = (list, cells, except) =>
+      list.some((s) => s.key !== except && s.cells.some((c) => cells.includes(c)))
+
+    function randomFleet() {
+      const outFleet = []
+      for (const f of FLEET) {
+        for (let tries = 0; tries < 200; tries++) {
+          const horiz = Math.random() < 0.5
+          const center = Math.floor(Math.random() * N * N)
+          const cells = centeredCells(f.len, center, horiz)
+          if (!overlaps(outFleet, cells, f.key)) {
+            outFleet.push({ key: f.key, cells })
+            break
+          }
+        }
+      }
+      return outFleet
+    }
+
+    const tray = document.getElementById('tray')
+    function renderTray() {
+      tray.innerHTML = ''
+      for (const f of FLEET) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.setAttribute('aria-pressed', String(selectedKey === f.key))
+        const dots = document.createElement('span')
+        dots.className = 'dots'
+        for (let i = 0; i < f.len; i++) dots.appendChild(document.createElement('i'))
+        b.appendChild(dots)
+        b.append(f.name)
+        b.onclick = () => {
+          selectedKey = f.key
+          renderTray()
+        }
+        tray.appendChild(b)
+      }
+    }
+
+    document.getElementById('btn-rotate').onclick = () => {
+      const s = ships.find((x) => x.key === selectedKey)
+      if (!s) return
+      const def = FLEET.find((f) => f.key === s.key)
+      const mid = Math.floor((def.len - 1) / 2)
+      const pivots = [s.cells[mid], ...s.cells.filter((_, k) => k !== mid)]
+      for (const p of pivots) {
+        const cells = centeredCells(def.len, p, !isHoriz(s.cells))
+        if (!overlaps(ships, cells, s.key)) {
+          s.cells = cells
+          renderFleet()
+          return
+        }
+      }
+    }
+
+    document.getElementById('btn-random').onclick = () => {
+      ships = randomFleet()
+      renderFleet()
+    }
+
+    document.getElementById('btn-board').onclick = () => {
+      currentBoard = currentBoard === 'me' ? 'enemy' : 'me'
+      document.getElementById('board-label').textContent = currentBoard === 'me' ? 'Your Fleet' : 'Enemy Waters'
+      tray.style.display = currentBoard === 'me' ? 'flex' : 'none'
+    }
+
+    function resize() {
+      const width = stage.clientWidth
+      const height = stage.clientHeight
+      if (width <= 0 || height <= 0) return
+      renderer.setSize(width, height, false)
+      const aspect = width / height
+      const minW = N + 1.8
+      const minH = N + 4.4
+      const halfH = Math.max(minH / 2, minW / (2 * aspect))
+      const halfW = halfH * aspect
+      camera.left = -halfW
+      camera.right = halfW
+      camera.top = halfH
+      camera.bottom = -halfH
+      camera.updateProjectionMatrix()
+    }
+    new ResizeObserver(resize).observe(stage)
+
+    renderFleet()
+    renderTray()
+    resize()
+    document.getElementById('loading').remove()
+
+    const clock = new THREE.Clock()
+    function loop() {
+      requestAnimationFrame(loop)
+      const t = clock.getElapsedTime()
+      waterMat.uniforms.t.value = t
+      for (const o of bobbers) {
+        o.position.y = o.userData.baseY + Math.sin(t * 1.6 + o.userData.bob) * 0.035
+        o.rotation.z = Math.sin(t * 1.1 + o.userData.bob) * 0.04 + (o.userData.rz || 0)
+      }
+      for (const f of foamRings) {
+        f.m.scale.setScalar(1 + Math.sin(t * 1.1 + f.ph) * 0.05)
+        f.m.material.opacity = 0.22 + Math.sin(t * 1.1 + f.ph) * 0.1
+      }
+      const targetX = BOARD_X[currentBoard]
+      camTarget.x += (targetX - camTarget.x) * 0.12
+      camera.position.set(camTarget.x, 40, camTarget.z)
+      camera.up.set(0, 0, -1)
+      camera.lookAt(camTarget.x, 0, camTarget.z)
+      renderer.render(scene, camera)
+    }
+    loop()
+  </script>
+</body>
+</html>

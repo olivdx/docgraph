@@ -11,7 +11,7 @@ const ROUND =
 export const FIRE_BTN = `${ROUND} bg-[radial-gradient(circle_at_50%_35%,#ffd36b,#ffb627_55%,#c9820a)] text-[#3b2200] shadow-[0_6px_0_#8a5600,0_10px_22px_rgba(0,0,0,.4)] disabled:grayscale disabled:brightness-[.55]`
 export const READY_BTN = `${ROUND} bg-[radial-gradient(circle_at_50%_35%,#8af0b6,#4fd18b_55%,#2a9a5e)] text-[#06301a] shadow-[0_6px_0_#1d6b41,0_10px_22px_rgba(0,0,0,.4)] disabled:grayscale disabled:brightness-[.55]`
 const TOOL =
-  'h-11 rounded-[14px] border border-line bg-panel px-3 font-display text-sm text-white active:translate-y-0.5 disabled:opacity-50'
+  'h-11 rounded-[14px] border border-white/15 bg-white/10 px-3 font-display text-sm text-white backdrop-blur-md active:translate-y-0.5 disabled:opacity-50'
 
 export function BattleControls({
   target,
@@ -31,7 +31,7 @@ export function BattleControls({
   const [confirm, setConfirm] = useState(false)
   if (confirm) {
     return (
-      <div className="flex items-center gap-2 rounded-[14px] border border-line bg-panel p-2.5 text-sm">
+      <div className="flex items-center gap-2 rounded-[14px] border border-white/15 bg-white/10 p-2.5 text-sm backdrop-blur-md">
         <span className="flex-1">Give up this battle? Your opponent wins.</span>
         <button type="button" onClick={() => setConfirm(false)} className={TOOL}>
           Keep playing

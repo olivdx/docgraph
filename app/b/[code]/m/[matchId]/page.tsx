@@ -252,7 +252,7 @@ export default function BattleMatchPage() {
 
       <MatchHud view={view} clockMs={clock} label={label} />
 
-      <div ref={setStageEl} className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-line bg-[#2b8db3]">
+      <div ref={setStageEl} className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-white/15 bg-[#2b8db3]/40">
         <canvas
           ref={setCanvasEl}
           className="block size-full touch-none"
@@ -266,7 +266,7 @@ export default function BattleMatchPage() {
         )}
         {toast && (
           <div
-            className={`pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#0b1f33]/85 px-4 py-2 font-display text-sm whitespace-nowrap ${
+            className={`pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/20 bg-slate-950/45 px-4 py-2 font-display text-sm whitespace-nowrap backdrop-blur-md ${
               toast.bad ? 'text-rose-200 shadow-[inset_0_0_0_2px_var(--o)]' : 'text-white'
             }`}
           >
@@ -372,17 +372,17 @@ function ResultPanel({ view, code }: { view: BattleMatchView; code: string }) {
   const reason = view.endReason ? END_COPY[view.endReason] : ''
   const reasonText = won || you === null ? reason : view.endReason === 'fleet_sunk' ? 'Your fleet was sunk' : view.endReason === 'resign' ? 'You gave up' : view.endReason === 'afk' ? 'Too many missed turns' : reason
   return (
-    <div className="absolute inset-0 grid place-items-center bg-[#0b1f33]/70">
+    <div className="absolute inset-0 grid place-items-center bg-slate-950/45 backdrop-blur-md">
       <div className="flex max-w-[290px] flex-col items-center gap-2.5 p-5 text-center">
         <h2 className={`font-display text-4xl ${won ? 'text-amber-300' : 'text-white'}`}>{title}</h2>
         <p className="font-bold text-sky-100/80">{reasonText}</p>
         {you && (
           <div className="grid w-full grid-cols-2 gap-2">
-            <div className="rounded-xl border border-line bg-panel p-2.5">
+            <div className="rounded-xl border border-white/15 bg-white/10 p-2.5 backdrop-blur-md">
               <b className="block font-display text-xl tabular-nums">{mine.length}</b>
               <span className="text-[10px] font-extrabold tracking-wider text-muted uppercase">Shots</span>
             </div>
-            <div className="rounded-xl border border-line bg-panel p-2.5">
+            <div className="rounded-xl border border-white/15 bg-white/10 p-2.5 backdrop-blur-md">
               <b className="block font-display text-xl tabular-nums">{mine.length ? Math.round((hits / mine.length) * 100) : 0}%</b>
               <span className="text-[10px] font-extrabold tracking-wider text-muted uppercase">Accuracy</span>
             </div>
