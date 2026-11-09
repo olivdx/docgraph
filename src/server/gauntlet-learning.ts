@@ -1,7 +1,7 @@
 import { bookMove, isForcedPosition } from '@/src/game/bot-gauntlet'
 import { canonicalPosition, deltasFromGame, gameId, hintsFromDoc, type GauntletHints, type GameRecord } from '@/src/game/gauntlet-learn'
 import { sideToMove } from '@/src/game/rules'
-import type { Side } from '@/src/game/types'
+import type { Move, Side } from '@/src/game/types'
 import { isBotId } from '@/src/tournament/match'
 import { resolveBotLevel, type Match, type Room } from '@/src/tournament/types'
 import type { GauntletBookStore } from './gauntlet-book-store'
@@ -12,6 +12,8 @@ const BOOK_PLIES = 3
 
 export interface GauntletLearning {
   hintsFor(room: Room, m: Match): Promise<GauntletHints | undefined>
+  /** Learned hints for `side` to move in this position, whoever is playing it; never throws. */
+  hintsForPosition(moves: Move[], side: Side): Promise<GauntletHints | undefined>
   learnFromWrite(before: Room, after: Room, now: number): Promise<void>
 }
 
@@ -42,21 +44,27 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined>
 const defaultLog = (message: string, error?: unknown) => console.warn(`[gauntlet-learn] ${message}`, error ?? '')
 
 export function createGauntletLearning(store: GauntletBookStore, log = defaultLog): GauntletLearning {
+  const positionHints = async (moves: Move[], side: Side): Promise<GauntletHints | undefined> => {
+    if (moves.length < BOOK_PLIES || sideToMove(moves) !== side) return undefined
+    const pos = canonicalPosition(moves)
+    try {
+      const doc = await withTimeout(store.getBook(pos.key, side), HINT_TIMEOUT_MS)
+      if (doc === undefined) return undefined
+      return hintsFromDoc(doc, pos)
+    } catch (error) {
+      log('hintsFor failed', error)
+      return undefined
+    }
+  }
+
   return {
     async hintsFor(room, m) {
       const botSide = learnableBotSide(room, m)
       if (!botSide || m.status !== 'playing' || m.botMoveDueAt === null) return undefined
-      if (m.moves.length < BOOK_PLIES || sideToMove(m.moves) !== botSide) return undefined
-      const pos = canonicalPosition(m.moves)
-      try {
-        const doc = await withTimeout(store.getBook(pos.key, botSide), HINT_TIMEOUT_MS)
-        if (doc === undefined) return undefined
-        return hintsFromDoc(doc, pos)
-      } catch (error) {
-        log('hintsFor failed', error)
-        return undefined
-      }
+      return positionHints(m.moves, botSide)
     },
+
+    hintsForPosition: positionHints,
 
     async learnFromWrite(before, after, now) {
       try {

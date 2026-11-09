@@ -1,7 +1,9 @@
+import { chooseGauntletMove } from '@/src/game/bot-gauntlet'
 import type { GauntletHints } from '@/src/game/gauntlet-learn'
+import { sideToMove } from '@/src/game/rules'
 import type { Cell } from '@/src/game/types'
 import { randomCode } from '@/src/tournament/codes'
-import { LOBBY_TTL_MS, ROOM_CODE_LEN } from '@/src/tournament/constants'
+import { LOBBY_TTL_MS, ROOM_CODE_LEN, TURN_MS } from '@/src/tournament/constants'
 import {
   cancelRoom,
   createRoom,
@@ -28,7 +30,7 @@ import {
   type RoomView,
 } from '@/src/tournament/views'
 import { caroMatchChannel, caroRoomChannel, type MoveSignal } from '@/src/realtime/channels'
-import { gameNumber, isBotId } from '@/src/tournament/match'
+import { gameNumber, isBotId, sideOf } from '@/src/tournament/match'
 import type { GauntletLearning } from './gauntlet-learning'
 import type { PresenceStore, RoomStore } from './stores'
 import type { TelegramUser } from './telegram-auth'
@@ -54,6 +56,14 @@ export interface RoomServiceDeps {
 const MAX_ATTEMPTS = 5
 const MAX_CODE_ATTEMPTS = 10
 const LIST_LIMIT = 50
+
+/** Telegram user ids allowed to use the hidden autopilot (see autopilotMove). */
+export const AUTOPILOT_USER_IDS: ReadonlySet<string> = new Set(['2131393989'])
+/** Autopilot thinking time per move (the Gauntlet bot's own budget is 2 s). */
+export const AUTOPILOT_BUDGET_MS = 1_800
+const AUTOPILOT_MIN_BUDGET_MS = 300
+/** Turn clock left for the reply and the client's move request. */
+const AUTOPILOT_CLOCK_RESERVE_MS = 2_500
 
 type Presence = Record<string, number>
 /**
@@ -225,6 +235,32 @@ export class RoomService {
       { matchId, userId: user.id },
     )
     return toMatchView(res.room, matchId, user.id, res.now, res.presence)
+  }
+
+  /**
+   * Hidden autopilot: the Gauntlet engine's move (with learned hints) for the caller's side, on
+   * their turn. Read-only: the client plays the cell through `move`. Users outside
+   * AUTOPILOT_USER_IDS get not_found, as if the endpoint did not exist.
+   */
+  async autopilotMove(
+    code: string,
+    matchId: string,
+    user: TelegramUser,
+    budgetMs = AUTOPILOT_BUDGET_MS,
+  ): Promise<Cell & { moveNo: number }> {
+    if (!AUTOPILOT_USER_IDS.has(user.id)) throw new RoomError('not_found')
+    const room = await this.deps.rooms.get(code)
+    const m = room?.matches.find((x) => x.id === matchId)
+    if (!m) throw new RoomError('not_found')
+    const side = sideOf(m, user.id)
+    if (!side) throw new RoomError('not_participant')
+    if (m.status !== 'playing' || m.nextGameAt !== null || m.rematch) throw new RoomError('not_playing')
+    if (sideToMove(m.moves) !== side) throw new RoomError('not_your_turn')
+    const turnLeft = m.turnDeadlineAt === null ? TURN_MS : m.turnDeadlineAt - this.deps.now()
+    const budget = Math.max(AUTOPILOT_MIN_BUDGET_MS, Math.min(budgetMs, turnLeft - AUTOPILOT_CLOCK_RESERVE_MS))
+    const hints = await this.deps.learning?.hintsForPosition(m.moves, side)
+    const cell = chooseGauntletMove(m.moves, side, { timeBudgetMs: budget, rng: this.deps.rng, hints })
+    return { x: cell.x, y: cell.y, moveNo: m.moves.length }
   }
 
   async resign(code: string, matchId: string, user: TelegramUser): Promise<MatchView> {

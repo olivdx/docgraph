@@ -18,6 +18,7 @@ describe('RoomService gauntlet wiring', () => {
         hintsForCalls++
         return base.hintsFor(...args)
       },
+      hintsForPosition: base.hintsForPosition,
       learnFromWrite: base.learnFromWrite,
     }
     let afterWriteCalls = 0

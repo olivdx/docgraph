@@ -11,6 +11,7 @@ import { Board } from '@/src/client/board'
 import { Mark } from '@/src/client/marks'
 import { applyMoveSignal, isBehindSignal, SIGNAL_GRACE_MS, type PendingSignal } from '@/src/client/match-signal'
 import { useRealtime } from '@/src/client/realtime'
+import { useAutopilot } from '@/src/client/use-autopilot'
 import { caroMatchChannel, type MoveSignal } from '@/src/realtime/channels'
 import { TURN_MS } from '@/src/tournament/constants'
 import type { Cell, Side } from '@/src/game/types'
@@ -25,6 +26,8 @@ const WATCH_POLL_MS = 3_000
 const DEADLINE_SLACK_MS = 150
 const NEXT_POLL_MS = 3_000 // after the match: waiting for the next match to become pending
 const TICK_MS = 250
+/** An autopilot move never lands faster than this, so book and forced moves don't look instant. */
+const AUTOPILOT_MIN_MS = 600
 
 type EndReason = NonNullable<MatchView['endReason']>
 
@@ -214,11 +217,12 @@ export default function MatchPage() {
     return () => clearTimeout(id)
   }, [toast])
 
+  /** Plays `cell` for you; resolves true when the server accepted the move. */
   const play = useCallback(
-    async (cell: Cell) => {
-      if (flying.current || !state) return
+    async (cell: Cell): Promise<boolean> => {
+      if (flying.current || !state) return false
       const prev = state.view
-      if (!prev.you || prev.turn !== prev.you || prev.status !== 'playing') return
+      if (!prev.you || prev.turn !== prev.you || prev.status !== 'playing') return false
       flying.current = true
       setInFlight(true)
       const at = Date.now()
@@ -231,11 +235,13 @@ export default function MatchPage() {
         },
         at,
       })
+      let ok = false
       try {
         const v = await apiPost<MatchView>(`${path}/move`, { x: cell.x, y: cell.y, clientMoveNo: prev.moves.length })
         flying.current = false
         // Ignore every response to a request sent before this one returned (it may predate the move).
         apply(++seq.current, v)
+        ok = true
       } catch (e) {
         flying.current = false
         setState({ view: prev, at: state.at })
@@ -253,9 +259,53 @@ export default function MatchPage() {
         setInFlight(false)
       }
       void poll()
+      return ok
     },
     [state, path, apply, poll],
   )
+
+  // Hidden autopilot (X on, Z off): on your turn the server's Gauntlet engine picks the move and
+  // this page plays it like a tap. The server refuses (404) users who aren't allowed.
+  const { on: autopilot, disable: disableAutopilot } = useAutopilot()
+  const autopilotRef = useRef(false)
+  const playRef = useRef(play)
+  /** Position the autopilot is handling, so each position gets one move. */
+  const autoKey = useRef<string | null>(null)
+  useEffect(() => {
+    playRef.current = play
+  }, [play])
+  useEffect(() => {
+    autopilotRef.current = autopilot
+    if (!autopilot) autoKey.current = null
+  }, [autopilot])
+  useEffect(() => {
+    if (!autopilot || !state || inFlight) return
+    const v = state.view
+    const side = v.you
+    if (!side || v.status !== 'playing' || v.turn !== side) return
+    const key = `${v.gameNo}:${v.moves.length}`
+    if (autoKey.current === key) return
+    autoKey.current = key
+    const retry = () => {
+      if (autoKey.current === key) autoKey.current = null
+    }
+    const started = Date.now()
+    apiPost<Cell & { moveNo: number }>(`${path}/assist`)
+      .then(async (res) => {
+        const wait = AUTOPILOT_MIN_MS - (Date.now() - started)
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        // Drop the move if you played meanwhile, the opponent moved, or autopilot was switched off.
+        const cur = latest.current
+        if (!autopilotRef.current || autoKey.current !== key) return
+        if (!cur || cur.status !== 'playing' || cur.turn !== side || cur.gameNo !== v.gameNo) return
+        if (cur.moves.length !== v.moves.length || res.moveNo !== v.moves.length) return
+        if (!(await playRef.current({ x: res.x, y: res.y }))) retry()
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404 && e.code === 'not_found') disableAutopilot()
+        else retry()
+      })
+  }, [autopilot, state, inFlight, path, disableAutopilot])
 
   const resign = useCallback(async () => {
     const free = state?.view.mode === 'free'
