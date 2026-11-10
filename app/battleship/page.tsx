@@ -8,6 +8,7 @@ import { roomPath } from '@/src/client/routes'
 import { initTelegram } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import { ShipThumb } from '@/src/client/battleship/ship-thumb'
+import { BATTLE_CODE_LEN } from '@/src/battleship/constants'
 import type { BattleRoomView, BattleSummary } from '@/src/battleship/views'
 
 const COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#6c79ff', '#06b6d4']
@@ -17,23 +18,30 @@ export default function BattleshipHome() {
   const router = useRouter()
   const rooms = usePoll<BattleSummary[]>('/api/battleship', 10_000)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ text: string; code?: string } | null>(null)
+  const [toast, setToast] = useState<{ text: string; code?: string; retryPath?: string } | null>(null)
 
   useEffect(() => {
     initTelegram()
   }, [])
 
   const act = useCallback(
-    async (path: string) => {
+    async (path: string, leaveCurrent = false) => {
       if (busy) return
       setBusy(true)
+      setToast(null)
       try {
-        const v = await apiPost<BattleRoomView>(path)
+        const v = await apiPost<BattleRoomView>(path, leaveCurrent ? { leaveCurrent: true } : undefined)
         router.push(`/b/${v.code}`)
       } catch (e) {
         if (e instanceof ApiError && e.code === 'already_active') {
           const code = String(e.extra.activeCode ?? '')
-          setToast({ text: `You're already in ${code}`, code })
+          // Another Battleship cup can be left on the spot; a Caro or Sudoku room can't.
+          const battle = code.length === BATTLE_CODE_LEN
+          setToast({
+            text: battle ? `You're in cup ${code}. Leave it and continue? You'll lose any match you're in.` : `You're already in ${code}`,
+            code,
+            retryPath: battle ? path : undefined,
+          })
         } else if (e instanceof ApiError && e.code === 'not_lobby') {
           setToast({ text: 'That cup has already started.' })
         } else if (e instanceof ApiError && e.code === 'full') {
@@ -144,12 +152,20 @@ export default function BattleshipHome() {
       {toast && (
         <div className="fixed inset-x-4 bottom-4 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-line bg-panel p-3 text-sm shadow-xl">
           <span className="flex-1">{toast.text}</span>
+          {toast.retryPath && (
+            <button
+              onClick={() => void act(toast.retryPath!, true)}
+              className="rounded-[10px] bg-rose-500/90 px-3 py-1.5 font-display text-xs text-white uppercase"
+            >
+              LEAVE &amp; CONTINUE
+            </button>
+          )}
           {toast.code && (
             <button
               onClick={() => router.push(roomPath(toast.code!))}
               className="arcade-glow rounded-[10px] bg-accent px-3 py-1.5 font-display text-xs text-white uppercase"
             >
-              GO
+              {toast.retryPath ? 'BACK TO IT' : 'GO'}
             </button>
           )}
           <button onClick={() => setToast(null)} aria-label="Dismiss" className="text-muted">

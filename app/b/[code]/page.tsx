@@ -8,6 +8,7 @@ import { roomPath } from '@/src/client/routes'
 import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import { battleshipRoomChannel } from '@/src/realtime/channels'
+import { BATTLE_CODE_LEN } from '@/src/battleship/constants'
 import type { BattleBracketMatch, BattleRoomView } from '@/src/battleship/views'
 
 const AVATAR_COLORS = ['#0ea5e9', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#6c79ff']
@@ -56,6 +57,7 @@ function BattleRoom() {
   const [blockedBy, setBlockedBy] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const joinTried = useRef(false)
 
   const view = override && (!room || override.serverNow > room.serverNow) ? override : room
@@ -104,6 +106,23 @@ function BattleRoom() {
     }
     router.push(`/b/${code}/m/${yourMatchId}`)
   }, [yourMatchId, code, router])
+
+  /** Leaves the Battleship cup you're in elsewhere, then joins this one. */
+  const leaveAndJoin = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await apiPost<BattleRoomView>(`/api/battleship/${code}/join`, { leaveCurrent: true })
+      setBlockedBy(null)
+      setOverride(r)
+      router.replace(`/b/${code}`)
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'not_lobby') setToast('This cup has already started.')
+      else if (e instanceof ApiError && e.code === 'full') setToast('This cup is full.')
+      else setToast('Could not join this cup.')
+    }
+    setBusy(false)
+  }, [busy, code, router])
 
   const act = useCallback(
     async (action: 'start' | 'cancel' | 'leave') => {
@@ -178,6 +197,15 @@ function BattleRoom() {
             <button
               type="button"
               disabled={busy}
+              onClick={() => act('leave')}
+              className="rounded-[10px] border border-line bg-panel2 px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
+              title="Leave: another player becomes host"
+            >
+              LEAVE
+            </button>
+            <button
+              type="button"
+              disabled={busy}
               onClick={() => act('cancel')}
               className="rounded-[10px] border border-line bg-panel2 px-2.5 py-2 font-display text-[11px] tracking-wider text-muted uppercase disabled:opacity-50"
             >
@@ -193,10 +221,39 @@ function BattleRoom() {
           >
             LEAVE
           </button>
+        ) : view.status === 'running' && view.youAreIn ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setConfirmLeave(true)}
+            className="flex-none rounded-[10px] border border-line bg-panel2 px-2.5 py-2 font-display text-[11px] tracking-wider text-white uppercase disabled:opacity-50"
+          >
+            LEAVE CUP
+          </button>
         ) : view.status !== 'lobby' ? (
           <span className="lime-pill">{view.status.toUpperCase()}</span>
         ) : null}
       </div>
+
+      {confirmLeave && (
+        <div className="flex items-center gap-2 rounded-[14px] border border-o/50 bg-panel p-3 text-sm">
+          <span className="flex-1">Leave this cup? You lose any match you&apos;re in and can&apos;t come back.</span>
+          <button type="button" onClick={() => setConfirmLeave(false)} className="rounded-[10px] border border-line bg-panel2 px-3 py-2 text-xs font-bold">
+            Stay
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setConfirmLeave(false)
+              void act('leave')
+            }}
+            className="rounded-[10px] bg-rose-500/90 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            Leave
+          </button>
+        </div>
+      )}
 
       {blockedBy !== null && (
         <div className="rounded-[10px] border border-[#78591a] bg-[#3a2a0b] px-2.5 py-2 text-xs text-amber-200">
@@ -204,6 +261,14 @@ function BattleRoom() {
           <button onClick={() => router.push(blockedBy ? roomPath(blockedBy) : '/')} className="font-semibold underline">
             Go back
           </button>
+          {blockedBy.length === BATTLE_CODE_LEN && view.status === 'lobby' && (
+            <>
+              {' '}or{' '}
+              <button type="button" disabled={busy} onClick={() => void leaveAndJoin()} className="font-semibold underline">
+                leave it and join this cup
+              </button>
+            </>
+          )}
         </div>
       )}
 

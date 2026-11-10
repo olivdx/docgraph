@@ -45,6 +45,8 @@ export interface BattleRoomView {
   name: string
   status: BattleRoomStatus
   isHost: boolean
+  /** In the lobby, or still in the running cup (not knocked out, not left): can Leave. */
+  youAreIn: boolean
   players: { name: string; avatarUrl: string | null; isHost: boolean }[]
   minPlayers: number
   rounds: { name: string; matches: BattleBracketMatch[] }[]
@@ -142,6 +144,7 @@ export function toBattleRoomView(room: BattleRoom, viewerId: string, now: number
     name: room.name,
     status: room.status,
     isHost: room.hostId === viewerId,
+    youAreIn: isActiveBattle(room, viewerId),
     players: room.players.map((p) => ({ name: p.name, avatarUrl: p.avatarUrl, isHost: p.userId === room.hostId })),
     minPlayers: MIN_PLAYERS,
     rounds,

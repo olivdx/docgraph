@@ -1,5 +1,5 @@
 import { authenticate } from '@/src/server/telegram-auth'
-import { codeOf, errorResponse, getBattleshipService } from '@/src/server/http'
+import { codeOf, errorResponse, getBattleshipService, parseLeaveCurrent, readJson } from '@/src/server/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +11,7 @@ export async function POST(req: Request, ctx: RouteContext<'/api/battleship/[cod
     const svc = await getBattleshipService()
     switch (action) {
       case 'join':
-        return Response.json(await svc.join(code, user))
+        return Response.json(await svc.join(code, user, { leaveCurrent: parseLeaveCurrent(await readJson(req)) }))
       case 'leave':
         return Response.json(await svc.leave(code, user))
       case 'cancel':

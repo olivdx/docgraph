@@ -28,6 +28,7 @@ const END_COPY: Record<string, string> = {
   afk: 'Too many missed turns',
   disconnect_timeout: 'Opponent disconnected',
   resign: 'Opponent gave up',
+  left: 'Opponent left the cup',
 }
 
 /** Which sea the camera should show for this view (null: leave it where it is). */
@@ -370,7 +371,7 @@ function ResultPanel({ view, code }: { view: BattleMatchView; code: string }) {
   const hits = mine.filter((s) => s.result !== 'miss').length
   const title = you === null ? `${winnerName ?? '?'} wins` : won ? 'Victory!' : 'Defeat'
   const reason = view.endReason ? END_COPY[view.endReason] : ''
-  const reasonText = won || you === null ? reason : view.endReason === 'fleet_sunk' ? 'Your fleet was sunk' : view.endReason === 'resign' ? 'You gave up' : view.endReason === 'afk' ? 'Too many missed turns' : reason
+  const reasonText = won || you === null ? reason : view.endReason === 'fleet_sunk' ? 'Your fleet was sunk' : view.endReason === 'resign' ? 'You gave up' : view.endReason === 'left' ? 'You left the cup' : view.endReason === 'afk' ? 'Too many missed turns' : reason
   return (
     <div className="absolute inset-0 grid place-items-center bg-[#0b1f33]/70">
       <div className="flex max-w-[290px] flex-col items-center gap-2.5 p-5 text-center">

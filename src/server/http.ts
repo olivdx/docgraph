@@ -187,6 +187,19 @@ export function parseEntryBody(json: unknown): { cell: number; digit: number; se
   return { cell: c, digit: d, seq: n }
 }
 
+/** `{ leaveCurrent?: boolean }` on a Battleship create/join: leave the cup you're in first. */
+export function parseLeaveCurrent(json: unknown): boolean {
+  if (json === undefined || json === null) return false
+  if (!isObject(json)) throw badRequest()
+  if (json.leaveCurrent === undefined) return false
+  if (typeof json.leaveCurrent !== 'boolean') throw badRequest()
+  return json.leaveCurrent
+}
+
+export function parseBattleCreateBody(json: unknown): { name?: string; leaveCurrent: boolean } {
+  return { name: parseCreateBody(json), leaveCurrent: parseLeaveCurrent(json) }
+}
+
 /** Shape check only; validateFleet does the game rules. */
 export function parseFleetBody(json: unknown): { ships: Ship[]; lock: boolean } {
   if (!isObject(json) || !Array.isArray(json.ships) || typeof json.lock !== 'boolean') throw badRequest()
