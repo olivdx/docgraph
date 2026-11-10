@@ -155,6 +155,46 @@ describe('BattleshipService', () => {
     expect(after.turn).not.toBe(v.turn)
   })
 
+  it('creating a cup with leaveCurrent leaves the old cup (lobby: host handed over)', async () => {
+    const s = setup()
+    const old = await s.svc.create(tg(1))
+    await s.svc.join(old.code, tg(2))
+    expect((await err(s.svc.create(tg(1)))).extra).toEqual({ activeCode: old.code })
+    const fresh = await s.svc.create(tg(1), undefined, { leaveCurrent: true })
+    expect(fresh.code).not.toBe(old.code)
+    expect(await s.svc.activeCode('u1')).toBe(fresh.code)
+    const oldView = await s.svc.getRoom(old.code, tg(2))
+    expect(oldView.status).toBe('lobby')
+    expect(oldView.isHost).toBe(true)
+    expect(oldView.players.map((p) => p.name)).toEqual(['User 2'])
+  })
+
+  it('joining another cup with leaveCurrent forfeits the live match in the old one', async () => {
+    const s = setup()
+    const { code, id } = await twoPlayerMatch(s)
+    const other = await s.svc.create(tg(3))
+    expect((await err(s.svc.join(other.code, tg(1)))).code).toBe('already_active')
+    await s.svc.join(other.code, tg(1), { leaveCurrent: true })
+    const v = await s.svc.getMatch(code, id, tg(2))
+    expect(v.status).toBe('finished')
+    expect(v.endReason).toBe('left')
+    expect(v.winner).toBe(v.you)
+    expect(await s.svc.activeCode('u1')).toBe(other.code)
+  })
+
+  it('leaveCurrent never leaves a Caro or Sudoku room', async () => {
+    const blocked = setup('CAROXX').svc
+    expect((await err(blocked.create(tg(1), undefined, { leaveCurrent: true }))).extra).toEqual({ activeCode: 'CAROXX' })
+  })
+
+  it('leave from a running cup is reported to the room view', async () => {
+    const s = setup()
+    const { code } = await twoPlayerMatch(s)
+    const v = await s.svc.leave(code, tg(1))
+    expect(v.youAreIn).toBe(false)
+    expect(v.status).toBe('finished')
+  })
+
   it('list shows open cups', async () => {
     const s = setup()
     const { code } = await s.svc.create(tg(1))

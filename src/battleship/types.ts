@@ -22,7 +22,8 @@ export interface Shot {
 }
 
 export type BattleMatchStatus = 'waiting' | 'pending' | 'placing' | 'playing' | 'finished'
-export type BattleEndReason = 'fleet_sunk' | 'no_show' | 'afk' | 'disconnect_timeout' | 'resign' | 'bye'
+/** `left`: the loser left the cup (Leave cup, or started/joined another cup). */
+export type BattleEndReason = 'fleet_sunk' | 'no_show' | 'afk' | 'disconnect_timeout' | 'resign' | 'bye' | 'left'
 
 export interface BattleMatch {
   id: string
@@ -55,6 +56,8 @@ export interface BattlePlayer {
   userId: string
   name: string
   avatarUrl: string | null
+  /** Set when the player left a running cup: every match of theirs is lost (missing on older rooms). */
+  leftAt?: number | null
   seed: number | null
   joinedAt: number
 }

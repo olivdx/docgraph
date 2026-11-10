@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildInviteUrl, errorResponse, parseCreateBody, parseFireBody, parseFleetBody, parseFormatBody, parseMoveBody } from '@/src/server/http'
+import { buildInviteUrl, errorResponse, parseBattleCreateBody, parseCreateBody, parseFireBody, parseFleetBody, parseFormatBody, parseLeaveCurrent, parseMoveBody } from '@/src/server/http'
 import { RoomError } from '@/src/tournament/types'
 import { roomPath } from '@/src/client/routes'
 
@@ -127,5 +127,17 @@ describe('roomPath', () => {
     expect(roomPath('ABCD')).toBe('/b/ABCD')
     expect(roomPath('ABCDE')).toBe('/s/ABCDE')
     expect(roomPath('ABCDEF')).toBe('/r/ABCDEF')
+  })
+})
+
+describe('battleship create/join bodies', () => {
+  it('reads name and leaveCurrent', () => {
+    expect(parseBattleCreateBody({ name: ' Sea ', leaveCurrent: true })).toEqual({ name: 'Sea', leaveCurrent: true })
+    expect(parseBattleCreateBody(undefined)).toEqual({ name: undefined, leaveCurrent: false })
+    expect(parseLeaveCurrent({ leaveCurrent: true })).toBe(true)
+    expect(parseLeaveCurrent(undefined)).toBe(false)
+  })
+  it('rejects a non-boolean leaveCurrent', async () => {
+    expect((await status(() => parseLeaveCurrent({ leaveCurrent: 'yes' })))?.s).toBe(400)
   })
 })

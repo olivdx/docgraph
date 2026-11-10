@@ -55,12 +55,38 @@ export function joinBattle(room: BattleRoom, user: UserInfo, now: number): Battl
   return r
 }
 
-export function leaveBattle(room: BattleRoom, userId: string): BattleRoom {
+/**
+ * Leaves the cup. In the lobby the player is removed; a leaving host hands the cup to a random
+ * remaining player (alone: the cup is cancelled). In a running cup the player loses their live match
+ * at once (`left`) and any later match as soon as it is set up. A knocked-out player, or a finished
+ * cup, is left unchanged.
+ */
+export function leaveBattle(room: BattleRoom, userId: string, now: number, rng: Rng): BattleRoom {
   if (!room.players.some((p) => p.userId === userId)) return room
-  if (room.status !== 'lobby') throw new RoomError('not_lobby')
-  if (userId === room.hostId) throw new RoomError('host_must_cancel')
+  if (room.status === 'lobby') {
+    const r = clone(room)
+    r.players = r.players.filter((p) => p.userId !== userId)
+    if (userId === r.hostId) {
+      if (r.players.length === 0) {
+        r.status = 'cancelled'
+        r.finishedAt = now
+        r.expiresAt = new Date(now + FINISHED_TTL_MS)
+      } else {
+        r.hostId = r.players[Math.floor(rng() * r.players.length)].userId
+      }
+    }
+    return r
+  }
+  if (room.status !== 'running') return room
   const r = clone(room)
-  r.players = r.players.filter((p) => p.userId !== userId)
+  settleInPlace(r, null, now, rng)
+  if (!isActiveBattle(r, userId)) return room // already knocked out: nothing to leave
+  r.players.find((p) => p.userId === userId)!.leftAt = now
+  for (const m of r.matches) {
+    const seat = seatOf(m, userId)
+    if (seat && (m.status === 'placing' || m.status === 'playing')) finishMatch(r, m, otherSeat(seat), 'left', now)
+  }
+  settleInPlace(r, null, now, rng) // pending matches (now or later) resolve through stepMatch
   return r
 }
 
@@ -295,7 +321,8 @@ export function resignBattle(
 
 /** In the lobby, or not yet knocked out of a running cup. */
 export function isActiveBattle(room: Pick<BattleRoom, 'players' | 'status' | 'matches'>, userId: string): boolean {
-  if (!room.players.some((p) => p.userId === userId)) return false
+  const me = room.players.find((p) => p.userId === userId)
+  if (!me || me.leftAt != null) return false
   if (room.status === 'lobby') return true
   if (room.status !== 'running') return false
   const mine = room.matches.filter((m) => m.a === userId || m.b === userId)

@@ -30,6 +30,10 @@ export function seatOf(m: Pick<BattleMatch, 'a' | 'b'>, userId: string): Seat | 
   return null
 }
 
+export function hasLeft(room: BattleRoom, userId: string | null): boolean {
+  return room.players.find((p) => p.userId === userId)?.leftAt != null
+}
+
 function seedOf(room: BattleRoom, userId: string | null): number {
   return room.players.find((p) => p.userId === userId)?.seed ?? Number.MAX_SAFE_INTEGER
 }
@@ -127,6 +131,14 @@ export function stepMatch(room: BattleRoom, m: BattleMatch, presence: Presence, 
       return promote(m, now)
 
     case 'pending': {
+      // An entrant who left the cup loses at once (both left: the lower seed is credited).
+      const aLeft = hasLeft(room, m.a)
+      const bLeft = hasLeft(room, m.b)
+      if (aLeft || bLeft) {
+        const winner: Seat = aLeft && bLeft ? (seedOf(room, m.a) < seedOf(room, m.b) ? 'a' : 'b') : aLeft ? 'b' : 'a'
+        finishMatch(room, m, winner, 'left', m.pendingSince ?? now)
+        return true
+      }
       const { a, b } = m.readyAt
       if (a !== null && b !== null) {
         startPlacing(m, Math.max(a, b))

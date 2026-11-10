@@ -74,12 +74,29 @@ describe('lobby', () => {
     for (let i = 3; i <= 32; i++) r = joinBattle(r, user(i), T0)
     expect(err(() => joinBattle(r, user(33), T0))).toBe('full')
   })
-  it('host must cancel; others may leave; only the host cancels', () => {
+  it('a player may leave the lobby; only the host cancels', () => {
     const r = joinBattle(createBattleRoom({ code: 'ABCD', host: user(1), now: T0 }), user(2), T0)
-    expect(err(() => leaveBattle(r, 'u1'))).toBe('host_must_cancel')
-    expect(leaveBattle(r, 'u2').players).toHaveLength(1)
+    expect(leaveBattle(r, 'u2', T0, mulberry(1)).players).toHaveLength(1)
     expect(err(() => cancelBattle(r, 'u2', T0))).toBe('not_host')
     expect(cancelBattle(r, 'u1', T0).status).toBe('cancelled')
+  })
+  it('a host leaving the lobby hands the cup to a random remaining player', () => {
+    let r = createBattleRoom({ code: 'ABCD', host: user(1), now: T0 })
+    for (let i = 2; i <= 6; i++) r = joinBattle(r, user(i), T0)
+    const hosts = new Set<string>()
+    for (let seed = 1; seed <= 40; seed++) {
+      const left = leaveBattle(r, 'u1', T0, mulberry(seed))
+      expect(left.status).toBe('lobby')
+      expect(left.players.map((p) => p.userId)).not.toContain('u1')
+      expect(left.players.map((p) => p.userId)).toContain(left.hostId)
+      hosts.add(left.hostId)
+    }
+    expect(hosts.size).toBeGreaterThan(1) // random, not always the next in line
+  })
+  it('a host alone in the lobby leaving cancels the cup', () => {
+    const r = createBattleRoom({ code: 'ABCD', host: user(1), now: T0 })
+    const left = leaveBattle(r, 'u1', T0, mulberry(1))
+    expect(left.status).toBe('cancelled')
   })
   it('needs 2 players and the host to start', () => {
     const solo = createBattleRoom({ code: 'ABCD', host: user(1), now: T0 })
@@ -345,5 +362,56 @@ describe('seatOf and isActiveBattle', () => {
     ;({ r } = playOut(r, qf.id, 'a', T0))
     expect(isActiveBattle(r, qf.b!)).toBe(false) // knocked out in the quarterfinal
     expect(isActiveBattle(r, qf.a!)).toBe(true) // semifinal still waiting for its other entrant
+  })
+})
+
+describe('leaving a running cup', () => {
+  it('mid-match: the opponent wins with "left" and the leaver is out', () => {
+    let r = cup(2)
+    const id = r.matches[0].id
+    r = toBattle(r, id, T0)
+    const m = match(r, id)
+    r = leaveBattle(r, m.a!, T0 + 5000, mulberry(1))
+    const after = match(r, id)
+    expect(after.status).toBe('finished')
+    expect(after.winner).toBe('b')
+    expect(after.endReason).toBe('left')
+    expect(isActiveBattle(r, m.a!)).toBe(false)
+    expect(r.status).toBe('finished') // a 2-player cup ends with the final
+  })
+  it('during placement and before the match is opened', () => {
+    let r = cup(2)
+    const id = r.matches[0].id
+    const m = match(r, id)
+    const pending = leaveBattle(r, m.b!, T0 + 1000, mulberry(1))
+    expect(match(pending, id)).toMatchObject({ status: 'finished', winner: 'a', endReason: 'left' })
+    r = markBattleReady(r, id, m.a!, T0, mulberry(1), null)
+    r = markBattleReady(r, id, m.b!, T0, mulberry(1), null)
+    const placing = leaveBattle(r, m.a!, T0 + 2000, mulberry(1))
+    expect(match(placing, id)).toMatchObject({ status: 'finished', winner: 'b', endReason: 'left' })
+  })
+  it('while waiting for the next match: the next opponent wins by walkover once known', () => {
+    let r = cup(4)
+    let t = T0
+    const [semi1, semi2] = playable(r)
+    r = toBattle(r, semi1.id, t)
+    ;({ r, t } = playOut(r, semi1.id, 'a', t))
+    const finalist = match(r, semi1.id).a!
+    expect(isActiveBattle(r, finalist)).toBe(true)
+    r = leaveBattle(r, finalist, t + 1000, mulberry(1))
+    expect(isActiveBattle(r, finalist)).toBe(false)
+    r = toBattle(r, semi2.id, t + 2000)
+    ;({ r, t } = playOut(r, semi2.id, 'b', t + 2000))
+    const final = r.matches.find((x) => x.kind === 'normal' && x.round === 1)!
+    expect(final.status).toBe('finished')
+    expect(final.endReason).toBe('left')
+    expect(final[final.winner!]).toBe(match(r, semi2.id).b)
+  })
+  it('after being knocked out, leaving changes nothing', () => {
+    let r = cup(8)
+    const qf = playable(r)[0]
+    r = toBattle(r, qf.id, T0)
+    ;({ r } = playOut(r, qf.id, 'a', T0))
+    expect(leaveBattle(r, qf.b!, T0 + 99_000, mulberry(1))).toEqual(r)
   })
 })

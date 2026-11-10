@@ -28,6 +28,7 @@ const END_COPY: Record<string, string> = {
   afk: 'Too many missed turns',
   disconnect_timeout: 'Opponent disconnected',
   resign: 'Opponent gave up',
+  left: 'Opponent left the cup',
 }
 
 /** Which sea the camera should show for this view (null: leave it where it is). */
@@ -138,6 +139,9 @@ export default function BattleMatchPage() {
   }, [yourTurn, scene])
 
   const [busy, setBusy] = useState(false)
+  // After the result: hide the panel and look at both revealed fleets.
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewBoard, setReviewBoard] = useState<Board>('enemy')
   const post = useCallback(
     async (action: string, body?: unknown) => {
       try {
@@ -288,7 +292,16 @@ export default function BattleMatchPage() {
             {sceneError ?? 'Loading the sea…'}
           </div>
         )}
-        {view.status === 'finished' && <ResultPanel view={view} code={code} />}
+        {view.status === 'finished' && !reviewing && (
+          <ResultPanel
+            view={view}
+            code={code}
+            onReview={() => {
+              setReviewing(true)
+              void scene?.focus(reviewBoard)
+            }}
+          />
+        )}
       </div>
 
       {placingMine ? (
@@ -310,10 +323,61 @@ export default function BattleMatchPage() {
           onFire={fire}
           onResign={() => void post('resign')}
         />
+      ) : view.status === 'finished' && reviewing ? (
+        <FleetReview
+          view={view}
+          board={reviewBoard}
+          onBoard={(b) => {
+            setReviewBoard(b)
+            void scene?.focus(b)
+          }}
+          onResult={() => setReviewing(false)}
+        />
       ) : (
         <div className="h-[78px]" />
       )}
     </main>
+  )
+}
+
+/** After the match: both fleets are revealed; switch the camera between the two seas. */
+function FleetReview({
+  view,
+  board,
+  onBoard,
+  onResult,
+}: {
+  view: BattleMatchView
+  board: Board
+  onBoard: (b: Board) => void
+  onResult: () => void
+}) {
+  const me: Seat = view.you ?? 'a'
+  const label = (b: Board) => {
+    const seat = b === 'me' ? me : other(me)
+    if (view.you) return b === 'me' ? 'Your fleet' : `${view.players[seat]?.name ?? 'Their'}'s fleet`
+    return `${view.players[seat]?.name ?? '?'}'s fleet`
+  }
+  const tab = (b: Board) =>
+    `min-w-0 flex-1 truncate rounded-[12px] px-2 py-2.5 font-display text-xs tracking-wider uppercase ${
+      board === b ? 'arcade-glow bg-accent text-white' : 'border border-line bg-panel text-muted'
+    }`
+  return (
+    <div className="flex h-[78px] items-center gap-2">
+      <button type="button" onClick={() => onBoard('me')} className={tab('me')} aria-pressed={board === 'me'}>
+        {label('me')}
+      </button>
+      <button type="button" onClick={() => onBoard('enemy')} className={tab('enemy')} aria-pressed={board === 'enemy'}>
+        {label('enemy')}
+      </button>
+      <button
+        type="button"
+        onClick={onResult}
+        className="flex-none rounded-[12px] border border-line bg-panel2 px-3 py-2.5 font-display text-xs tracking-wider text-white uppercase"
+      >
+        Result
+      </button>
+    </div>
   )
 }
 
@@ -361,7 +425,7 @@ function PlacementLayer({
   )
 }
 
-function ResultPanel({ view, code }: { view: BattleMatchView; code: string }) {
+function ResultPanel({ view, code, onReview }: { view: BattleMatchView; code: string; onReview: () => void }) {
   const router = useRouter()
   const you = view.you
   const won = you !== null && view.winner === you
@@ -370,7 +434,7 @@ function ResultPanel({ view, code }: { view: BattleMatchView; code: string }) {
   const hits = mine.filter((s) => s.result !== 'miss').length
   const title = you === null ? `${winnerName ?? '?'} wins` : won ? 'Victory!' : 'Defeat'
   const reason = view.endReason ? END_COPY[view.endReason] : ''
-  const reasonText = won || you === null ? reason : view.endReason === 'fleet_sunk' ? 'Your fleet was sunk' : view.endReason === 'resign' ? 'You gave up' : view.endReason === 'afk' ? 'Too many missed turns' : reason
+  const reasonText = won || you === null ? reason : view.endReason === 'fleet_sunk' ? 'Your fleet was sunk' : view.endReason === 'resign' ? 'You gave up' : view.endReason === 'left' ? 'You left the cup' : view.endReason === 'afk' ? 'Too many missed turns' : reason
   return (
     <div className="absolute inset-0 grid place-items-center bg-slate-950/45 backdrop-blur-md">
       <div className="flex max-w-[290px] flex-col items-center gap-2.5 p-5 text-center">
@@ -388,6 +452,12 @@ function ResultPanel({ view, code }: { view: BattleMatchView; code: string }) {
             </div>
           </div>
         )}
+        <button
+          onClick={onReview}
+          className="w-full rounded-xl border border-sky-300/40 bg-sky-500/20 p-3 font-display text-sm tracking-wider text-white uppercase"
+        >
+          View fleets
+        </button>
         {view.nextMatchId && (
           <button
             onClick={() => router.push(`/b/${code}/m/${view.nextMatchId}`)}

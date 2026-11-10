@@ -105,8 +105,9 @@ export class BattleshipService {
 
   // ---- room commands ---------------------------------------------------------------------------
 
-  async create(user: TelegramUser, name?: string): Promise<BattleRoomView> {
-    await this.assertNotActiveElsewhere(user.id, null)
+  /** `leaveCurrent`: first leave the Battleship cup the user is in (never a Caro or Sudoku room). */
+  async create(user: TelegramUser, name?: string, opts: { leaveCurrent?: boolean } = {}): Promise<BattleRoomView> {
+    await this.assertNotActiveElsewhere(user, null, !!opts.leaveCurrent)
     for (let i = 0; i < MAX_CODE_ATTEMPTS; i++) {
       const now = this.deps.now()
       const room = createBattleRoom({ code: randomCode(BATTLE_CODE_LEN, this.deps.rng), host: userInfo(user), name, now })
@@ -120,14 +121,14 @@ export class BattleshipService {
     return this.roomView(room, user, now)
   }
 
-  async join(code: string, user: TelegramUser): Promise<BattleRoomView> {
-    await this.assertNotActiveElsewhere(user.id, code)
+  async join(code: string, user: TelegramUser, opts: { leaveCurrent?: boolean } = {}): Promise<BattleRoomView> {
+    await this.assertNotActiveElsewhere(user, code, !!opts.leaveCurrent)
     const { room, now } = await this.mutate(code, (_l, _p, t, settled) => joinBattle(settled(), userInfo(user), t))
     return this.roomView(room, user, now)
   }
 
   async leave(code: string, user: TelegramUser): Promise<BattleRoomView> {
-    const { room, now } = await this.mutate(code, (_l, _p, _t, settled) => leaveBattle(settled(), user.id))
+    const { room, now } = await this.mutate(code, (_l, _p, t, settled) => leaveBattle(settled(), user.id, t, this.deps.rng))
     return this.roomView(room, user, now)
   }
 
@@ -184,11 +185,14 @@ export class BattleshipService {
     return toBattleRoomView(room, user.id, now, this.deps.inviteUrl(room._id))
   }
 
-  private async assertNotActiveElsewhere(userId: string, exceptCode: string | null): Promise<void> {
-    const other = await this.deps.activeElsewhere?.(userId)
+  /** Caro/Sudoku rooms always block; the user's own other Battleship cup is left when `leaveCurrent`. */
+  private async assertNotActiveElsewhere(user: TelegramUser, exceptCode: string | null, leaveCurrent: boolean): Promise<void> {
+    const other = await this.deps.activeElsewhere?.(user.id)
     if (other) throw new RoomError('already_active', { activeCode: other })
-    const mine = await this.activeCode(userId)
-    if (mine && mine !== exceptCode) throw new RoomError('already_active', { activeCode: mine })
+    const mine = await this.activeCode(user.id)
+    if (!mine || mine === exceptCode) return
+    if (!leaveCurrent) throw new RoomError('already_active', { activeCode: mine })
+    await this.leave(mine, user)
   }
 
   /** Last-seen times of the players in placing/playing matches (plus the caller's match). */
