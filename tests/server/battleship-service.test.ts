@@ -115,7 +115,7 @@ describe('BattleshipService', () => {
     const v = await s.svc.getMatch(code, id, tg(1))
     const opp = v.you === 'a' ? 'b' : 'a'
     expect(v.fleets[opp]).toEqual([])
-    expect(v.fleets[v.you!]).toHaveLength(5)
+    expect(v.fleets[v.you!]).toHaveLength(6)
   })
 
   it('notify: a shot rings the match channel only; finishing rings the room too', async () => {

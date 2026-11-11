@@ -94,14 +94,14 @@ describe('errorResponse: free play', () => {
 })
 
 describe('parseFleetBody', () => {
-  it('accepts up to 5 ships with integer cells and a boolean lock', () => {
+  it('accepts up to 6 ships with integer cells and a boolean lock', () => {
     const ships = [{ key: 'brig', cells: [0, 1] }]
     expect(parseFleetBody({ ships, lock: false })).toEqual({ ships, lock: false })
   })
   it('rejects malformed bodies with 400', async () => {
     const bad = [
       { ships: 'x', lock: true },
-      { ships: [1, 2, 3, 4, 5, 6].map(() => ({ key: 'brig', cells: [0, 1] })), lock: true },
+      { ships: [1, 2, 3, 4, 5, 6, 7].map(() => ({ key: 'brig', cells: [0, 1] })), lock: true },
       { ships: [{ key: 'ghost', cells: [0, 1, 2, 3, 4, 5] }], lock: true },
       { ships: [{ key: 'brig', cells: [0.5, 1] }], lock: true },
       { ships: [{ key: 5, cells: [0, 1] }], lock: true },

@@ -46,7 +46,7 @@ describe('toBattleMatchView', () => {
     const m = r.matches[0]
     const asOther = toBattleMatchView(r, id, m[other]!, t, null)
     // The shooter fired at `other`'s fleet: other sees its own fleet in full.
-    expect(asOther.fleets[other]).toHaveLength(5)
+    expect(asOther.fleets[other]).toHaveLength(6)
     // The shooter's own view of the other fleet: only the sunk sloop.
     const asShooter = toBattleMatchView(r, id, m[shooter]!, t, null)
     expect(asShooter.fleets[other]).toEqual([{ key: 'sloop', cells: [98, 99] }])
@@ -79,8 +79,8 @@ describe('toBattleMatchView', () => {
       r = fire(r, id, m[seat]!, cell, m.shots[seat].length + 1, t, mulberry(1), null)
     }
     const v = toBattleMatchView(r, id, 'u9', T0 + 99_000, null)
-    expect(v.fleets.a).toHaveLength(5)
-    expect(v.fleets.b).toHaveLength(5)
+    expect(v.fleets.a).toHaveLength(6)
+    expect(v.fleets.b).toHaveLength(6)
     expect(v.winner).toBe(shooter)
   })
 

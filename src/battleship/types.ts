@@ -1,4 +1,4 @@
-export type ShipKey = 'ghost' | 'galleon' | 'frigate' | 'brig' | 'sloop'
+export type ShipKey = 'ghost' | 'galleon' | 'frigate' | 'brig' | 'sloop' | 'rowboat'
 
 export interface Ship {
   key: ShipKey

@@ -196,9 +196,9 @@ describe('ready and placement', () => {
     r = settleBattle(r, null, T0 + 45_001, mulberry(1)).room
     const p = match(r, m.id)
     expect(p.status).toBe('playing')
-    expect(p.fleets.a).toHaveLength(5)
+    expect(p.fleets.a).toHaveLength(6)
     expect(p.fleets.a.find((s) => s.key === 'galleon')!.cells).toEqual([44, 45, 46, 47])
-    expect(p.fleets.b).toHaveLength(5)
+    expect(p.fleets.b).toHaveLength(6)
     expect(p.startedAt).toBe(T0 + 45_000)
   })
   it('saveFleet errors: bad_fleet, locked, not_placing', () => {
@@ -264,6 +264,7 @@ describe('battle', () => {
       'hit', 'hit', 'sunk',
       'hit', 'hit', 'sunk',
       'hit', 'sunk',
+      'sunk',
     ])
     const other: Seat = shooter === 'a' ? 'b' : 'a'
     expect(m.shots[other]).toHaveLength(0) // never got a turn

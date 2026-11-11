@@ -23,6 +23,7 @@ export const SHIP_MODEL: Record<ShipKey, ModelName> = {
   frigate: 'ship-pirate-medium',
   brig: 'ship-pirate-medium',
   sloop: 'ship-pirate-small',
+  rowboat: 'boat-row-small',
 }
 
 import { MODEL_BASE } from './asset-paths'

@@ -35,7 +35,7 @@ const shot = (cell: number, result: Shot['result'], shipKey: Shot['shipKey'] = n
 })
 
 describe('board and fleet', () => {
-  it('is a 10×10 sea with the classic 5-4-3-3-2 fleet', () => {
+  it('is a 10×10 sea with the 5-4-3-3-2-1 fleet', () => {
     expect(N).toBe(10)
     expect(CELLS).toBe(100)
     expect(FLEET.map((f) => [f.key, f.len])).toEqual([
@@ -44,6 +44,7 @@ describe('board and fleet', () => {
       ['frigate', 3],
       ['brig', 3],
       ['sloop', 2],
+      ['rowboat', 1],
     ])
   })
 })
@@ -82,6 +83,7 @@ describe('validateFleet', () => {
           { key: 'frigate', cells: [10, 11, 12] },
           { key: 'brig', cells: [13, 14, 15] },
           { key: 'sloop', cells: [16, 17] },
+          { key: 'rowboat', cells: [18] },
         ],
         true,
       ),
@@ -131,13 +133,23 @@ describe('shots', () => {
     expect(resolveShot(FLEET_A, [], 98)).toEqual({ result: 'hit', shipKey: 'sloop' })
     expect(resolveShot(FLEET_A, [shot(98, 'hit', 'sloop')], 99)).toEqual({ result: 'sunk', shipKey: 'sloop' })
   })
-  it('detects a sunk fleet only when all 17 cells are hit', () => {
+  it('detects a sunk fleet only when all 18 cells are hit', () => {
     const all = SHIP_CELLS.map((c) => shot(c, 'hit'))
-    expect(all).toHaveLength(17)
-    expect(fleetSunk(FLEET_A, all.slice(0, 16))).toBe(false)
+    expect(all).toHaveLength(18)
+    expect(fleetSunk(FLEET_A, all.slice(0, 17))).toBe(false)
     expect(fleetSunk(FLEET_A, all)).toBe(true)
   })
   it('lists the keys of sunk shots', () => {
     expect([...sunkKeys([shot(98, 'hit', 'sloop'), shot(99, 'sunk', 'sloop'), shot(3, 'miss')])]).toEqual(['sloop'])
+  })
+})
+
+describe('the 1-cell rowboat', () => {
+  it('is valid on any single cell and sinks with one hit', () => {
+    expect(() => validateFleet([{ key: 'rowboat', cells: [99] }], false)).not.toThrow()
+    expect(resolveShot(FLEET_A, [], 66)).toEqual({ result: 'sunk', shipKey: 'rowboat' })
+  })
+  it('rejects a rowboat with two cells', () => {
+    expect(() => validateFleet([{ key: 'rowboat', cells: [0, 1] }], false)).toThrow()
   })
 })
