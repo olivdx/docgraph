@@ -101,6 +101,7 @@ export class BattleScene {
   private cannons = {} as Record<Board, Cannon>
   private target = new THREE.Group()
   private ghosts = new Map<ShipKey, THREE.Group>()
+  private hideMine = false
   private ghostTiles: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = []
 
   private camTarget = new THREE.Vector3(BOARD_X.me, 0, 0)
@@ -177,6 +178,20 @@ export class BattleScene {
     return this.tween(0.9, (k) => {
       this.camTarget.x = from + (to - from) * ease(k)
     })
+  }
+
+  /**
+   * Hides the hulls of your own ships that are still afloat (someone may be looking at your screen).
+   * Hit markers, flames and sunk ships stay visible: the opponent knows those anyway.
+   */
+  setOwnFleetHidden(hidden: boolean): void {
+    this.hideMine = hidden
+    for (const s of this.ships.me.values()) this.applyHidden(s)
+  }
+
+  /** The hull is the model itself; flames are added next to it and stay visible. */
+  private applyHidden(s: ShipObj): void {
+    s.obj.children[0].visible = !(this.hideMine && !s.sunk)
   }
 
   /** Makes the ship models on `board` match `ships` (no animation). */
@@ -573,6 +588,7 @@ export class BattleScene {
     this.bobbers.push(w)
     const s: ShipObj = { obj: w, cells: ship.cells.join(), sunk: false }
     this.ships[board].set(ship.key, s)
+    if (board === 'me') this.applyHidden(s)
     return s
   }
 
@@ -648,6 +664,7 @@ export class BattleScene {
 
   private sinkPose(s: ShipObj): void {
     s.sunk = true
+    this.applyHidden(s)
     s.obj.userData.sinking = true
     s.obj.position.y = (s.obj.userData.baseY as number) - (s.obj.userData.h as number) * 0.55
     s.obj.rotation.z = 0.45
@@ -656,6 +673,7 @@ export class BattleScene {
 
   private sinkAnimated(s: ShipObj): void {
     s.sunk = true
+    this.applyHidden(s)
     const obj = s.obj
     obj.userData.sinking = true
     const y0 = obj.position.y

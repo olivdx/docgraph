@@ -20,6 +20,7 @@ type Handlers = Pick<Placement, 'onPointerDown' | 'onPointerMove' | 'onPointerUp
 
 const other = (s: Seat): Seat => (s === 'a' ? 'b' : 'a')
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+const HIDE_FLEET_KEY = 'battleship:hide-fleet'
 const shipName = (key: string | null) => FLEET.find((f) => f.key === key)?.name ?? 'ship'
 
 const END_COPY: Record<string, string> = {
@@ -121,6 +122,30 @@ export default function BattleMatchPage() {
       })
       .catch((e: unknown) => console.error(e))
   }, [scene, view, say])
+
+  // ---- hide my fleet: for when the opponent can see your screen (remembered on this device) ----
+  const [hideFleet, setHideFleet] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(HIDE_FLEET_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleHideFleet = () => {
+    const next = !hideFleet
+    setHideFleet(next)
+    say(next ? 'Your fleet is hidden on this screen' : 'Your fleet is visible again')
+    try {
+      window.localStorage.setItem(HIDE_FLEET_KEY, next ? '1' : '0')
+    } catch {
+      // private mode: the choice just isn't remembered
+    }
+  }
+  // Only during the battle: you need to see your ships to place them, and the result reveals everything.
+  const fleetHidden = hideFleet && !!view && view.status === 'playing' && view.you !== null
+  useEffect(() => {
+    scene?.setOwnFleetHidden(fleetHidden)
+  }, [scene, fleetHidden])
 
   // ---- missed turns ----
   const missed = view?.you ? view.missedTurns[view.you] : 0
@@ -254,7 +279,7 @@ export default function BattleMatchPage() {
         {!you && <span className="lime-pill">👁 WATCHING</span>}
       </div>
 
-      <MatchHud view={view} clockMs={clock} label={label} />
+      <MatchHud view={view} clockMs={clock} label={label} hideOwnHits={fleetHidden} />
 
       <div ref={setStageEl} className="relative min-h-0 flex-1 overflow-hidden rounded-[22px] border border-white/15 bg-[#2b8db3]/40">
         <canvas
@@ -267,6 +292,20 @@ export default function BattleMatchPage() {
         />
         {view.status === 'playing' && you && !yourTurn && (
           <div className="pointer-events-none absolute inset-0 rounded-[22px] shadow-[inset_0_0_0_3px_rgba(255,90,60,.6),inset_0_0_40px_rgba(255,90,60,.3)]" />
+        )}
+        {view.status === 'playing' && you && (
+          <button
+            type="button"
+            onClick={toggleHideFleet}
+            aria-pressed={hideFleet}
+            aria-label={hideFleet ? 'Show my fleet' : 'Hide my fleet'}
+            title={hideFleet ? 'Show my fleet' : 'Hide my fleet'}
+            className={`absolute top-3 right-3 grid size-9 place-items-center rounded-full border text-base backdrop-blur-md ${
+              hideFleet ? 'border-amber-300/70 bg-amber-400/25' : 'border-white/20 bg-slate-950/45'
+            }`}
+          >
+            {hideFleet ? '🙈' : '👁'}
+          </button>
         )}
         {toast && (
           <div

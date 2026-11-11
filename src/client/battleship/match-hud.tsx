@@ -22,8 +22,8 @@ function Avatar({ name, url, foe }: { name: string; url: string | null; foe?: bo
   )
 }
 
-/** Fleet pips: one block per ship cell. Your own hits show red; the enemy's ships only grey out once sunk. */
-function Pips({ view, seat, own }: { view: BattleMatchView; seat: Seat; own: boolean }) {
+/** Fleet pips: one block per ship cell. Your own hits show red (unless `hideHits`); the enemy's ships only grey out once sunk. */
+function Pips({ view, seat, own, hideHits = false }: { view: BattleMatchView; seat: Seat; own: boolean; hideHits?: boolean }) {
   const other: Seat = seat === 'a' ? 'b' : 'a'
   const incoming = view.shots[other]
   const sunk = new Set(incoming.filter((s) => s.result === 'sunk').map((s) => s.shipKey))
@@ -36,7 +36,7 @@ function Pips({ view, seat, own }: { view: BattleMatchView; seat: Seat; own: boo
         return (
           <span key={def.key} className={`flex gap-px ${isSunk ? 'opacity-35' : ''}`} title={def.name}>
             {Array.from({ length: def.len }, (_, k) => {
-              const hit = own && ship ? hitCells.has(ship.cells[k]) : false
+              const hit = own && !hideHits && ship ? hitCells.has(ship.cells[k]) : false
               return (
                 <i
                   key={k}
@@ -51,7 +51,18 @@ function Pips({ view, seat, own }: { view: BattleMatchView; seat: Seat; own: boo
   )
 }
 
-export function MatchHud({ view, clockMs, label }: { view: BattleMatchView; clockMs: number | null; label: string }) {
+export function MatchHud({
+  view,
+  clockMs,
+  label,
+  hideOwnHits = false,
+}: {
+  view: BattleMatchView
+  clockMs: number | null
+  label: string
+  /** Don't show which of your ships were hit (your fleet is hidden from onlookers). */
+  hideOwnHits?: boolean
+}) {
   const me: Seat = view.you ?? 'a'
   const foe: Seat = me === 'a' ? 'b' : 'a'
   const p1 = view.players[me]
@@ -65,7 +76,7 @@ export function MatchHud({ view, clockMs, label }: { view: BattleMatchView; cloc
         <Avatar name={p1?.name ?? '?'} url={p1?.avatarUrl ?? null} />
         <div className="flex min-w-0 flex-col gap-1">
           <span className="truncate text-xs font-bold">{view.you ? 'You' : (p1?.name ?? '?')}</span>
-          <Pips view={view} seat={me} own={!!view.you} />
+          <Pips view={view} seat={me} own={!!view.you} hideHits={hideOwnHits} />
         </div>
       </div>
       <div className="flex flex-col items-center gap-1">
