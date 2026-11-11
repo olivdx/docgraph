@@ -84,7 +84,9 @@ export function ShipThumb({
   }, [model, size])
 
   return (
-    <div className={`relative ${className}`} style={{ width: size, height: size }}>
+    // `relative` only when the caller doesn't position the thumb itself: Tailwind emits `relative` after
+    // `absolute`, so having both would silently keep the thumb in the normal flow.
+    <div className={`${/(^| )(absolute|fixed|sticky)( |$)/.test(className) ? '' : 'relative'} ${className}`} style={{ width: size, height: size }}>
       {!ready && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/assets/Previews/${model}.png`} alt="" className="absolute inset-0 size-full object-contain" />
