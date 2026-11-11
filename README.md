@@ -27,6 +27,7 @@ Copy `.env.example` to `.env.local` and fill it in. Never commit real credential
 | `TELEGRAM_BOT_TOKEN` | production | Bot token from BotFather. Used to verify the signature of `initData`. |
 | `TELEGRAM_BOT_USERNAME` | yes | Bot username without the `@`, used to build invite links. |
 | `TELEGRAM_MINIAPP_SHORTNAME` | yes | Short name of the Mini App registered with BotFather (see below). |
+| `TELEGRAM_WEBHOOK_SECRET` | for `/start` | Any random string (letters, digits, `_`, `-`). The bot webhook rejects every request that does not carry it. |
 
 The invite link has the form `https://t.me/<TELEGRAM_BOT_USERNAME>/<TELEGRAM_MINIAPP_SHORTNAME>?startapp=<ROOM_CODE>`.
 
@@ -67,5 +68,21 @@ Opening `https://t.me/<bot>/<shortname>?startapp=<ROOM_CODE>` then launches the 
 3. MongoDB Atlas, Network Access: Vercel functions use dynamic IP addresses, so add `0.0.0.0/0` (allow access from anywhere) to the IP access list, or use Vercel's Atlas integration / static outbound IPs if you need something tighter. Keep strong database credentials since the allow-list is open.
 4. Put the production URL into BotFather (`/newapp` or `/editapp`) as the Web App URL.
 5. Open `https://t.me/<bot>/<shortname>` in Telegram to check it loads.
+
+### Make `/start` open the app
+
+The bot answers `/start` with an **Open Game Cup** button (and `/start <ROOM_CODE>` with a button into that room). Telegram has to be told where to send the bot's messages, once:
+
+1. Set `TELEGRAM_WEBHOOK_SECRET` in Vercel and redeploy.
+2. Register the webhook (replace the three placeholders):
+
+   ```bash
+   curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+     -d "url=https://<your-domain>/api/telegram/webhook" \
+     -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>" \
+     -d 'allowed_updates=["message"]'
+   ```
+
+3. Send `/start` to the bot in Telegram.
 
 TTL indexes (`expiresAt`, `expireAfterSeconds: 0`) are created automatically on the first request after a cold start. Note that MongoDB's TTL monitor runs roughly once a minute, so expired rooms disappear shortly after their `expiresAt`.
