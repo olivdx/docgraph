@@ -10,6 +10,7 @@ import { usePoll } from '@/src/client/use-poll'
 import { ShipThumb } from '@/src/client/battleship/ship-thumb'
 import { BATTLE_CODE_LEN } from '@/src/battleship/constants'
 import type { BattleRoomView, BattleSummary } from '@/src/battleship/views'
+import type { RankingView } from '@/src/server/battleship-rating'
 
 const COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#6c79ff', '#06b6d4']
 const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]
@@ -17,6 +18,8 @@ const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charC
 export default function BattleshipHome() {
   const router = useRouter()
   const rooms = usePoll<BattleSummary[]>('/api/battleship', 10_000)
+  const ranking = usePoll<RankingView>('/api/battleship/ranking', 60_000)
+  const myRating = ranking.data?.me?.rating
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ text: string; code?: string; retryPath?: string } | null>(null)
 
@@ -121,7 +124,14 @@ export default function BattleshipHome() {
             <div className="text-xs text-muted">10×10 sea · 5 ships · hit to fire again</div>
           </div>
         </div>
-        <span className="lime-pill">FRIENDS ONLY</span>
+        <button
+          type="button"
+          onClick={() => router.push('/battleship/ranking')}
+          aria-label="Open the ranking"
+          className="lime-pill flex-none"
+        >
+          🏆 {myRating === undefined ? 'RANKING' : myRating.toLocaleString('en-US')}
+        </button>
       </header>
 
       <div className="relative overflow-hidden rounded-[20px] border border-line bg-[radial-gradient(circle_at_30%_20%,#1d8fc0,#0b2a44_85%)] p-4">

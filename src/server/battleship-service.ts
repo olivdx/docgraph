@@ -38,6 +38,8 @@ export interface BattleshipServiceDeps {
   activeElsewhere?: (userId: string) => Promise<string | null>
   /** Called after each successful write with the realtime channels whose content changed. */
   notify?: (channels: string[], version: number) => void
+  /** Called after each successful write with the room before and after it (ratings). */
+  afterWrite?: (before: BattleRoom, after: BattleRoom) => void
 }
 
 const MAX_ATTEMPTS = 5
@@ -253,6 +255,7 @@ export class BattleshipService {
   }
 
   private notifyChanged(before: BattleRoom, after: BattleRoom): void {
+    this.deps.afterWrite?.(before, after)
     if (!this.deps.notify) return
     const channels = changedChannels(before, after)
     if (channels.length) this.deps.notify(channels, after.version)

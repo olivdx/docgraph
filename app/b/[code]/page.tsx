@@ -9,6 +9,7 @@ import { shareInvite } from '@/src/client/telegram'
 import { usePoll } from '@/src/client/use-poll'
 import { battleshipRoomChannel } from '@/src/realtime/channels'
 import { BATTLE_CODE_LEN } from '@/src/battleship/constants'
+import { RANKED_MIN_PLAYERS } from '@/src/battleship/rating'
 import type { BattleBracketMatch, BattleRoomView } from '@/src/battleship/views'
 
 const AVATAR_COLORS = ['#0ea5e9', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#6c79ff']
@@ -355,6 +356,11 @@ function Lobby({ view, readOnly }: { view: BattleRoomView; readOnly: boolean }) 
           {n < view.minPlayers
             ? 'Need at least 2 captains. Share the invite link!'
             : `On start: ${n} captains → ${slots}-slot bracket, best of 1${slots > n ? `, ${slots - n} bye${slots - n > 1 ? 's' : ''}` : ''}.`}
+        </div>
+        <div className={`mt-1.5 text-xs ${n >= RANKED_MIN_PLAYERS ? 'text-lime' : 'text-muted'}`}>
+          {n >= RANKED_MIN_PLAYERS
+            ? '🏆 Ranked cup: matches count for the ranking.'
+            : `Unranked: ${RANKED_MIN_PLAYERS - n} more ${RANKED_MIN_PLAYERS - n === 1 ? 'captain' : 'captains'} to make it count for the ranking.`}
         </div>
       </div>
 

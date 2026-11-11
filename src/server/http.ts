@@ -9,6 +9,8 @@ import { MongoPresenceStore, MongoRoomStore } from './stores'
 import { SudokuService } from './sudoku-service'
 import { BattleshipService } from './battleship-service'
 import { MongoBattleStore } from './battleship-store'
+import { BattleshipRatingService } from './battleship-rating'
+import { MongoRatingStore } from './battleship-rating-store'
 import type { Ship } from '@/src/battleship/types'
 import { FLEET, MAX_SHIP_LEN } from '@/src/battleship/constants'
 import { MongoSudokuStore } from './sudoku-store'
@@ -40,6 +42,7 @@ interface Services {
   caro: RoomService
   sudoku: SudokuService
   battleship: BattleshipService
+  battleshipRatings: BattleshipRatingService
 }
 let servicesPromise: Promise<Services> | null = null
 
@@ -82,6 +85,7 @@ function getServices(): Promise<Services> {
           firstActive(userId, [(u) => out.caro.activeCode(u), (u) => out.battleship.activeCode(u)]),
         notify,
       })
+      out.battleshipRatings = new BattleshipRatingService({ store: new MongoRatingStore(db) })
       out.battleship = new BattleshipService({
         rooms: new MongoBattleStore(db),
         presence, // Battleship codes are 4 chars, so presence keys never collide with Caro's
@@ -90,6 +94,8 @@ function getServices(): Promise<Services> {
         inviteUrl: (code) => buildInviteUrl(code),
         activeElsewhere: (userId) => firstActive(userId, [(u) => out.caro.activeCode(u), (u) => out.sudoku.activeCode(u)]),
         notify,
+        // ratings are updated after the response is sent
+        afterWrite: (beforeRoom, afterRoom) => after(() => out.battleshipRatings.recordWrite(beforeRoom, afterRoom)),
       })
       return out
     })
@@ -103,6 +109,7 @@ function getServices(): Promise<Services> {
 export const getService = async (): Promise<RoomService> => (await getServices()).caro
 export const getSudokuService = async (): Promise<SudokuService> => (await getServices()).sudoku
 export const getBattleshipService = async (): Promise<BattleshipService> => (await getServices()).battleship
+export const getBattleshipRatings = async (): Promise<BattleshipRatingService> => (await getServices()).battleshipRatings
 
 const STATUS: Record<string, number> = {
   not_found: 404,
