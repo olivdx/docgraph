@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildInviteUrl, errorResponse, parseBattleCreateBody, parseCreateBody, parseFireBody, parseFleetBody, parseFormatBody, parseLeaveCurrent, parseMoveBody } from '@/src/server/http'
 import { RoomError } from '@/src/tournament/types'
-import { roomPath } from '@/src/client/routes'
+import { roomPath, startPath } from '@/src/client/routes'
 
 describe('errorResponse', () => {
   const cases: Array<[ConstructorParameters<typeof RoomError>[0], number]> = [
@@ -139,5 +139,15 @@ describe('battleship create/join bodies', () => {
   })
   it('rejects a non-boolean leaveCurrent', async () => {
     expect((await status(() => parseLeaveCurrent({ leaveCurrent: 'yes' })))?.s).toBe(400)
+  })
+})
+
+describe('startPath', () => {
+  it('a room code opens that room and joins it', () => {
+    expect(startPath('ab12')).toBe('/b/AB12?join=1')
+    expect(startPath('abc234')).toBe('/r/ABC234?join=1')
+  })
+  it('"ranking" opens the Battleship ranking', () => {
+    expect(startPath('ranking')).toBe('/battleship/ranking')
   })
 })

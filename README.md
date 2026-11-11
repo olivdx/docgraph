@@ -71,7 +71,7 @@ Opening `https://t.me/<bot>/<shortname>?startapp=<ROOM_CODE>` then launches the 
 
 ### Make `/start` open the app
 
-The bot answers `/start` with an **Open Game Cup** button (and `/start <ROOM_CODE>` with a button into that room). Telegram has to be told where to send the bot's messages, once:
+The bot answers `/start` with an **Open Game Cup** button (and `/start <ROOM_CODE>` with a button into that room). `/rank` replies with the Battleship top 10, the sender's own rank, and a button to the full ranking. Telegram has to be told where to send the bot's messages, once:
 
 1. Set `TELEGRAM_WEBHOOK_SECRET` in Vercel and redeploy.
 2. Register the webhook (replace the three placeholders):

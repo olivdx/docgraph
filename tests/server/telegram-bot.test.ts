@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWebhookAuthorized, replyToUpdate } from '@/src/server/telegram-bot'
+import { isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
 
 const env = { TELEGRAM_BOT_USERNAME: 'caroday_bot', TELEGRAM_MINIAPP_SHORTNAME: 'play' }
 const msg = (text: string, chatId = 42) => ({ update_id: 1, message: { message_id: 7, chat: { id: chatId, type: 'private' }, text } })
@@ -49,5 +49,41 @@ describe('isWebhookAuthorized', () => {
     expect(isWebhookAuthorized('', undefined)).toBe(false)
     expect(isWebhookAuthorized('', '')).toBe(false)
     expect(isWebhookAuthorized(null, undefined)).toBe(false)
+  })
+})
+
+describe('/rank', () => {
+  const from = (text: string) => ({ update_id: 3, message: { message_id: 9, chat: { id: -100, type: 'group' }, from: { id: 555 }, text } })
+  const row = (rank: number, name: string, rating: number) => ({ rank, name, avatarUrl: null, rating, wins: 3, losses: 1, isYou: false })
+  const top = Array.from({ length: 12 }, (_, i) => row(i + 1, `Captain ${i + 1}`, 1500 - i * 10))
+
+  it('rankCommand finds who asked and where', () => {
+    expect(rankCommand(from('/rank'), env)).toEqual({ chatId: -100, userId: '555' })
+    expect(rankCommand(from('/rank@caroday_bot'), env)).toEqual({ chatId: -100, userId: '555' })
+    expect(rankCommand(from('/start'), env)).toBeNull()
+    expect(rankCommand(from('/ranking'), env)).toBeNull()
+    expect(rankCommand(from('/rank@other_bot'), env)).toBeNull()
+    expect(rankCommand(msg('/rank'), env)).toBeNull() // no sender
+    expect(rankCommand(from('/rank'), {})).toBeNull()
+  })
+
+  it('lists the top 10 with medals, then your own line', () => {
+    const me = { ...row(27, 'Me', 1084), wins: 9, losses: 5, isYou: true, cupsWon: 2, lastDelta: 18 }
+    const r = rankReply(-100, { top, total: 248, me }, env)
+    expect(r).toMatchObject({ method: 'sendMessage', chat_id: -100 })
+    const lines = r.text.split('\n')
+    expect(lines).toContain('🥇 Captain 1 · 1,500')
+    expect(lines).toContain('🥉 Captain 3 · 1,480')
+    expect(lines).toContain('10. Captain 10 · 1,410')
+    expect(r.text).not.toContain('Captain 11')
+    expect(lines).toContain('You: #27 of 248 · 1,084 (9 W · 5 L)')
+    expect(r.reply_markup.inline_keyboard[0][0].url).toBe('https://t.me/caroday_bot/play?startapp=ranking')
+  })
+
+  it('says so when you are not ranked or nobody is', () => {
+    expect(rankReply(1, { top, total: 12, me: null }, env).text).toContain("You're not ranked yet")
+    const empty = rankReply(1, { top: [], total: 0, me: null }, env).text
+    expect(empty).toContain('No rated matches yet')
+    expect(empty).not.toContain('🥇')
   })
 })

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiGet } from '@/src/client/api'
-import { roomPath } from '@/src/client/routes'
+import { roomPath, startPath } from '@/src/client/routes'
 import { getStartParam, initTelegram } from '@/src/client/telegram'
 import { putPollCache, usePoll } from '@/src/client/use-poll'
 import { ShipThumb } from '@/src/client/battleship/ship-thumb'
@@ -45,7 +45,7 @@ export default function GamePicker() {
     }
     const start = getStartParam()
     if (start) {
-      router.replace(`${roomPath(start.toUpperCase())}?join=1`)
+      router.replace(startPath(start))
       return
     }
     apiGet<Me>('/api/me')
