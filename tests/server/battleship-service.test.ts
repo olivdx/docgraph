@@ -95,6 +95,15 @@ describe('BattleshipService', () => {
     expect(await s.svc.activeCode('u1')).toBeNull()
   })
 
+  it('match views carry the room version, which grows with every write', async () => {
+    const s = setup()
+    const { code, id } = await twoPlayerMatch(s)
+    const before = await s.svc.getMatch(code, id, tg(1))
+    const saved = await s.svc.saveFleet(code, id, tg(1), FLEET, true)
+    expect(saved.version).toBeGreaterThan(before.version)
+    expect((await s.svc.getMatch(code, id, tg(2))).version).toBe(saved.version)
+  })
+
   it('reload mid-placement returns the saved ships', async () => {
     const s = setup()
     const { code, id } = await twoPlayerMatch(s)

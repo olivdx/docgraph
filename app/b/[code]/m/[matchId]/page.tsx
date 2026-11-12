@@ -13,7 +13,7 @@ import type { BattleMatchView } from '@/src/battleship/views'
 import { BattleControls, PlacementButtons, coordName } from '@/src/client/battleship/battle-controls'
 import { MatchHud } from '@/src/client/battleship/match-hud'
 import { FloatingRotate, ShipTray, usePlacement, type Placement } from '@/src/client/battleship/placement-controls'
-import { boardOf, newShots, type Board, type NewShot } from '@/src/client/battleship/sync'
+import { boardOf, isNewerView, latestView, newShots, type Board, type NewShot } from '@/src/client/battleship/sync'
 import { useBattleScene } from '@/src/client/battleship/use-battle-scene'
 
 type Handlers = Pick<Placement, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerLeave'>
@@ -58,7 +58,7 @@ export default function BattleMatchPage() {
   const path = `/api/battleship/${code}/matches/${matchId}`
   const poll = usePoll<BattleMatchView>(path, 1_000, { channel: battleshipMatchChannel(code, matchId), liveIntervalMs: 2_000 })
   const [override, setOverride] = useState<BattleMatchView | null>(null)
-  const view = override && (!poll.data || override.serverNow > poll.data.serverNow) ? override : poll.data
+  const view = latestView(override, poll.data)
 
   // Element state (not refs): the canvas mounts only once the first view arrives, and the scene must
   // be created then, even if the (cached) models finished loading long before.
@@ -93,7 +93,7 @@ export default function BattleMatchPage() {
     chain.current = chain.current
       .then(async () => {
         const prev = shown.current
-        if (prev && v.serverNow <= prev.serverNow) return
+        if (prev && !isNewerView(prev, v)) return
         const me: Seat = v.you ?? 'a'
         const foe = other(me)
         if (!prev) {

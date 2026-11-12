@@ -31,3 +31,20 @@ export function newShots(prev: BattleMatchView | null, next: BattleMatchView): N
   }
   return out
 }
+
+type Stamped = Pick<BattleMatchView, 'version' | 'serverNow'>
+
+/**
+ * Whether `next` shows the match later than `prev`. The room version decides: a request stamps
+ * `serverNow` before its write lands, so a poll that read the room just before your shot was saved
+ * carries a later clock but the older state. The clock only orders views of the same version.
+ */
+export function isNewerView(prev: Stamped, next: Stamped): boolean {
+  return next.version > prev.version || (next.version === prev.version && next.serverNow > prev.serverNow)
+}
+
+/** The later of the answer to your own action and the polled view. */
+export function latestView<T extends Stamped>(override: T | null, polled: T | null): T | null {
+  if (!override || !polled) return override ?? polled
+  return isNewerView(polled, override) ? override : polled
+}

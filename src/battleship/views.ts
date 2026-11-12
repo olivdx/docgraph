@@ -90,6 +90,8 @@ export interface BattleMatchView {
   nextStep: NextStep
   nextMatchId: string | null
   serverNow: number
+  /** The room's write counter: orders two views of the match (clocks can't, see isNewerView). */
+  version: number
 }
 
 const LIVE: BattleMatchStatus[] = ['pending', 'placing', 'playing']
@@ -230,6 +232,7 @@ export function toBattleMatchView(
       room.matches.find((x) => x.id !== m.id && (x.a === viewerId || x.b === viewerId) && LIVE.includes(x.status))?.id ??
       null,
     serverNow: now,
+    version: room.version,
   }
 }
 
