@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { RANKED_MIN_PLAYERS } from '@/src/battleship/rating'
+import { isAdmin } from './admin'
 import type { RankingView } from './battleship-rating'
 
 type Env = Partial<Record<string, string>>
@@ -69,6 +70,30 @@ export function replyToUpdate(update: unknown, env: Env = process.env): BotReply
     text: 'Welcome to Game Cup! Play Caro, Sudoku and Battleship cups with your friends.',
     reply_markup: { inline_keyboard: [[{ text: '🎮 Open Game Cup', url }]] },
   }
+}
+
+export type TextReply = Pick<BotReply, 'method' | 'chat_id' | 'text'>
+
+/**
+ * `/reset`: wipes the Battleship ranking, for the admin only and only as `/reset confirm` (a bare
+ * `/reset` just explains that). `reset` says whether the caller should wipe; `reply` assumes it worked.
+ */
+export function resetCommand(update: unknown, env: Env = process.env): { reset: boolean; reply: TextReply } | null {
+  const cmd = parseCommand(update, env)
+  if (!cmd || cmd.name !== 'reset' || !cmd.userId) return null
+  const say = (text: string): TextReply => ({ method: 'sendMessage', chat_id: cmd.chatId, text })
+  if (!isAdmin(cmd.userId)) return { reset: false, reply: say('Only the admin can reset the ranking.') }
+  if (cmd.arg.toLowerCase() !== 'confirm') {
+    return {
+      reset: false,
+      reply: say(
+        ["This deletes every Battleship rating: all captains start again at 1,000, and it can't be undone.", '', 'Send /reset confirm to do it.'].join(
+          '\n',
+        ),
+      ),
+    }
+  }
+  return { reset: true, reply: say('Done. The Battleship ranking was reset: everyone starts again at 1,000.') }
 }
 
 /** Who sent `/rank` and where, or null when this update is not a `/rank` from a known sender. */

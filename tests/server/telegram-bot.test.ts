@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
+import { isWebhookAuthorized, resetCommand, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
 
 const env = { TELEGRAM_BOT_USERNAME: 'caroday_bot', TELEGRAM_MINIAPP_SHORTNAME: 'play' }
 const msg = (text: string, chatId = 42) => ({ update_id: 1, message: { message_id: 7, chat: { id: chatId, type: 'private' }, text } })
@@ -85,5 +85,40 @@ describe('/rank', () => {
     const empty = rankReply(1, { top: [], total: 0, me: null }, env).text
     expect(empty).toContain('No rated matches yet')
     expect(empty).not.toContain('🥇')
+  })
+})
+
+describe('/reset', () => {
+  const OWNER = 2131393989
+  const from = (id: number, text: string) => ({ update_id: 5, message: { message_id: 1, chat: { id: 77, type: 'private' }, from: { id }, text } })
+
+  it('anyone but the admin is refused and nothing is reset', () => {
+    const r = resetCommand(from(555, '/reset confirm'), env)
+    expect(r).toMatchObject({ reset: false, reply: { method: 'sendMessage', chat_id: 77 } })
+    expect(r!.reply.text).toContain('Only the admin')
+  })
+
+  it('the admin is first asked to confirm', () => {
+    const r = resetCommand(from(OWNER, '/reset'), env)
+    expect(r!.reset).toBe(false)
+    expect(r!.reply.text).toContain('/reset confirm')
+  })
+
+  it('the admin confirming resets the ranking', () => {
+    for (const text of ['/reset confirm', '/reset CONFIRM', '/reset@caroday_bot confirm']) {
+      const r = resetCommand(from(OWNER, text), env)
+      expect(r).toMatchObject({ reset: true, reply: { chat_id: 77 } })
+    }
+  })
+
+  it('any other word does not confirm', () => {
+    expect(resetCommand(from(OWNER, '/reset yes'), env)!.reset).toBe(false)
+    expect(resetCommand(from(OWNER, '/reset confirm now'), env)!.reset).toBe(false)
+  })
+
+  it('ignores other commands and messages without a sender', () => {
+    expect(resetCommand(from(OWNER, '/rank'), env)).toBeNull()
+    expect(resetCommand(from(OWNER, '/resetall'), env)).toBeNull()
+    expect(resetCommand(msg('/reset confirm'), env)).toBeNull()
   })
 })
