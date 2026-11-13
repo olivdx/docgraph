@@ -71,13 +71,6 @@ export function replyToUpdate(update: unknown, env: Env = process.env): BotReply
   }
 }
 
-/** The reply to `/id`: the sender's Telegram id, which is what `ADMIN_TELEGRAM_IDS` takes. */
-export function idReply(update: unknown, env: Env = process.env): Pick<BotReply, 'method' | 'chat_id' | 'text'> | null {
-  const cmd = parseCommand(update, env)
-  if (!cmd || cmd.name !== 'id' || !cmd.userId) return null
-  return { method: 'sendMessage', chat_id: cmd.chatId, text: `Your Telegram ID: ${cmd.userId}` }
-}
-
 /** Who sent `/rank` and where, or null when this update is not a `/rank` from a known sender. */
 export function rankCommand(update: unknown, env: Env = process.env): { chatId: number | string; userId: string } | null {
   const cmd = parseCommand(update, env)

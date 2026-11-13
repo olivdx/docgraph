@@ -5,7 +5,7 @@ import { errorResponse, getBattleshipRatings } from '@/src/server/http'
 
 export const dynamic = 'force-dynamic'
 
-/** Wipes the whole Battleship ranking. Admins only (ADMIN_TELEGRAM_IDS). */
+/** Wipes the whole Battleship ranking. Admins only (see isAdmin). */
 export async function POST(req: Request) {
   try {
     const user = authenticate(req)

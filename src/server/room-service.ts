@@ -1,3 +1,4 @@
+import { ADMIN_USER_IDS } from './admin'
 import { chooseGauntletMove } from '@/src/game/bot-gauntlet'
 import type { GauntletHints } from '@/src/game/gauntlet-learn'
 import { sideToMove } from '@/src/game/rules'
@@ -58,7 +59,7 @@ const MAX_CODE_ATTEMPTS = 10
 const LIST_LIMIT = 50
 
 /** Telegram user ids allowed to use the hidden autopilot (see autopilotMove). */
-export const AUTOPILOT_USER_IDS: ReadonlySet<string> = new Set(['2131393989'])
+export const AUTOPILOT_USER_IDS: ReadonlySet<string> = ADMIN_USER_IDS
 /** Autopilot thinking time per move (the Gauntlet bot's own budget is 2 s). */
 export const AUTOPILOT_BUDGET_MS = 1_800
 const AUTOPILOT_MIN_BUDGET_MS = 300

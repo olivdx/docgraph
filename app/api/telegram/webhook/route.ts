@@ -1,9 +1,9 @@
-import { idReply, isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
+import { isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
 import { getBattleshipRatings, readJson } from '@/src/server/http'
 
 export const dynamic = 'force-dynamic'
 
-/** Telegram bot webhook: /start opens the Mini App, /rank shows the Battleship ranking, /id tells you your Telegram id. */
+/** Telegram bot webhook: /start opens the Mini App, /rank shows the Battleship ranking. */
 export async function POST(req: Request) {
   if (!isWebhookAuthorized(req.headers.get('x-telegram-bot-api-secret-token'), process.env.TELEGRAM_WEBHOOK_SECRET)) {
     return new Response(null, { status: 401 })
@@ -12,9 +12,7 @@ export async function POST(req: Request) {
   try {
     const update = await readJson(req)
     const rank = rankCommand(update)
-    const reply = rank
-      ? rankReply(rank.chatId, await (await getBattleshipRatings()).ranking(rank.userId))
-      : (replyToUpdate(update) ?? idReply(update))
+    const reply = rank ? rankReply(rank.chatId, await (await getBattleshipRatings()).ranking(rank.userId)) : replyToUpdate(update)
     if (reply) return Response.json(reply)
   } catch (e) {
     console.error('[telegram-webhook]', e)
