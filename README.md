@@ -28,6 +28,7 @@ Copy `.env.example` to `.env.local` and fill it in. Never commit real credential
 | `TELEGRAM_BOT_USERNAME` | yes | Bot username without the `@`, used to build invite links. |
 | `TELEGRAM_MINIAPP_SHORTNAME` | yes | Short name of the Mini App registered with BotFather (see below). |
 | `TELEGRAM_WEBHOOK_SECRET` | for `/start` | Any random string (letters, digits, `_`, `-`). The bot webhook rejects every request that does not carry it. |
+| `ADMIN_TELEGRAM_IDS` | optional | Comma-separated Telegram user ids that may reset the Battleship ranking (a **Reset ranking** button appears on the Ranking screen). Send `/id` to the bot to see your id. |
 
 The invite link has the form `https://t.me/<TELEGRAM_BOT_USERNAME>/<TELEGRAM_MINIAPP_SHORTNAME>?startapp=<ROOM_CODE>`.
 

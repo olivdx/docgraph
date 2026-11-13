@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
+import { idReply, isWebhookAuthorized, rankCommand, rankReply, replyToUpdate } from '@/src/server/telegram-bot'
 
 const env = { TELEGRAM_BOT_USERNAME: 'caroday_bot', TELEGRAM_MINIAPP_SHORTNAME: 'play' }
 const msg = (text: string, chatId = 42) => ({ update_id: 1, message: { message_id: 7, chat: { id: chatId, type: 'private' }, text } })
@@ -85,5 +85,14 @@ describe('/rank', () => {
     const empty = rankReply(1, { top: [], total: 0, me: null }, env).text
     expect(empty).toContain('No rated matches yet')
     expect(empty).not.toContain('🥇')
+  })
+})
+
+describe('/id', () => {
+  it('tells the sender their Telegram id (needed for ADMIN_TELEGRAM_IDS)', () => {
+    const update = { update_id: 4, message: { message_id: 1, chat: { id: 42, type: 'private' }, from: { id: 555 }, text: '/id' } }
+    expect(idReply(update, env)).toEqual({ method: 'sendMessage', chat_id: 42, text: 'Your Telegram ID: 555' })
+    expect(idReply(msg('/id'), env)).toBeNull() // no sender
+    expect(idReply(msg('/start'), env)).toBeNull()
   })
 })

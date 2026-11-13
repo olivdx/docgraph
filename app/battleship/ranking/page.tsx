@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/src/client/back-button'
+import { apiPost } from '@/src/client/api'
 import { initTelegram } from '@/src/client/telegram'
-import { usePoll } from '@/src/client/use-poll'
+import { putPollCache, usePoll } from '@/src/client/use-poll'
 import { RANKED_MIN_PLAYERS } from '@/src/battleship/rating'
-import type { RankingView, RankRow } from '@/src/server/battleship-rating'
+import type { RankingResponse, RankRow } from '@/src/server/battleship-rating'
 
+const PATH = '/api/battleship/ranking'
 const COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#6c79ff', '#06b6d4']
 const MEDALS = ['🥇', '🥈', '🥉']
 const initial = (name: string) => [...name.trim()][0]?.toUpperCase() ?? '?'
@@ -31,7 +33,19 @@ function Avatar({ row, size }: { row: Pick<RankRow, 'name' | 'avatarUrl' | 'rank
 
 export default function BattleshipRanking() {
   const router = useRouter()
-  const ranking = usePoll<RankingView>('/api/battleship/ranking', 30_000)
+  const ranking = usePoll<RankingResponse>(PATH, 30_000)
+  // Admin only: wipe the whole ranking, after a second tap to confirm.
+  const [resetStep, setResetStep] = useState<'idle' | 'confirm' | 'busy' | 'failed'>('idle')
+  const reset = async () => {
+    setResetStep('busy')
+    try {
+      putPollCache(PATH, await apiPost<RankingResponse>(`${PATH}/reset`))
+      ranking.refresh()
+      setResetStep('idle')
+    } catch {
+      setResetStep('failed')
+    }
+  }
 
   useEffect(() => {
     initTelegram()
@@ -114,6 +128,36 @@ export default function BattleshipRanking() {
             Rated: matches in cups with {RANKED_MIN_PLAYERS}+ captains, once the battle has started. Win to take points from your
             opponent; reach the final for a bonus.
           </p>
+          {data.canReset &&
+            (resetStep === 'idle' || resetStep === 'failed' ? (
+              <button
+                type="button"
+                onClick={() => setResetStep('confirm')}
+                className="mx-auto rounded-[10px] border border-o/50 px-3 py-2 font-display text-xs tracking-wider text-o uppercase"
+              >
+                {resetStep === 'failed' ? 'Reset failed. Try again' : 'Reset ranking'}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-2xl border border-o/50 bg-panel p-3 text-sm">
+                <span className="flex-1">Delete every rating? All captains start again at 1,000. This can&apos;t be undone.</span>
+                <button
+                  type="button"
+                  disabled={resetStep === 'busy'}
+                  onClick={() => setResetStep('idle')}
+                  className="rounded-[10px] border border-line bg-panel2 px-3 py-1.5 font-display text-xs text-white uppercase disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={resetStep === 'busy'}
+                  onClick={() => void reset()}
+                  className="rounded-[10px] bg-rose-500/90 px-3 py-1.5 font-display text-xs text-white uppercase disabled:opacity-50"
+                >
+                  {resetStep === 'busy' ? 'Resetting…' : 'Reset'}
+                </button>
+              </div>
+            ))}
         </>
       )}
     </main>

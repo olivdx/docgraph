@@ -48,6 +48,8 @@ export interface RatingStore {
   top(limit: number): Promise<RatingDoc[]>
   countAbove(rating: number): Promise<number>
   count(): Promise<number>
+  /** Deletes every rating and every event: the ranking starts over. */
+  reset(): Promise<void>
 }
 
 export class MemoryRatingStore implements RatingStore {
@@ -96,6 +98,11 @@ export class MemoryRatingStore implements RatingStore {
 
   async count() {
     return this.docs.size
+  }
+
+  async reset() {
+    this.docs.clear()
+    this.events.clear()
   }
 }
 
@@ -163,5 +170,9 @@ export class MongoRatingStore implements RatingStore {
 
   count() {
     return this.col.estimatedDocumentCount()
+  }
+
+  async reset() {
+    await Promise.all([this.col.deleteMany({}), this.events.deleteMany({})])
   }
 }

@@ -10,7 +10,7 @@ import { usePoll } from '@/src/client/use-poll'
 import { ShipThumb } from '@/src/client/battleship/ship-thumb'
 import { BATTLE_CODE_LEN } from '@/src/battleship/constants'
 import type { BattleRoomView, BattleSummary } from '@/src/battleship/views'
-import type { RankingView } from '@/src/server/battleship-rating'
+import type { RankingResponse } from '@/src/server/battleship-rating'
 
 const COLORS = ['#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#6c79ff', '#06b6d4']
 const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]
@@ -18,7 +18,7 @@ const colorFor = (code: string) => COLORS[[...code].reduce((a, c) => a + c.charC
 export default function BattleshipHome() {
   const router = useRouter()
   const rooms = usePoll<BattleSummary[]>('/api/battleship', 10_000)
-  const ranking = usePoll<RankingView>('/api/battleship/ranking', 60_000)
+  const ranking = usePoll<RankingResponse>('/api/battleship/ranking', 60_000)
   const myRating = ranking.data?.me?.rating
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ text: string; code?: string; retryPath?: string } | null>(null)

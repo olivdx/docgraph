@@ -28,6 +28,9 @@ export interface RankingView {
   me: (RankRow & { cupsWon: number; lastDelta: number }) | null
 }
 
+/** What the ranking API sends: the view plus whether the caller may reset it. */
+export type RankingResponse = RankingView & { canReset: boolean }
+
 type Profiles = Record<string, { name: string; avatarUrl: string | null }>
 
 const TOP_LIMIT = 50
@@ -92,6 +95,11 @@ export class BattleshipRatingService {
         ev.at,
       )
     }
+  }
+
+  /** Wipes the whole ranking (admin only; the caller checks). Everyone starts again at the start rating. */
+  async reset(): Promise<void> {
+    await this.deps.store.reset()
   }
 
   async ranking(userId: string): Promise<RankingView> {

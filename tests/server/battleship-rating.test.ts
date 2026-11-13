@@ -178,6 +178,19 @@ describe('Battleship ratings', () => {
     expect((await ratings.ranking('u1')).me).toMatchObject({ rating: 1012, cupsWon: 3 })
   })
 
+  it('reset wipes every rating; play starts again from 1000 and old matches can be rated anew', async () => {
+    const { ratings } = setup()
+    const ev = matchEvent('ABCD:m1', 'u1', 'u2', T0)
+    await ratings.applyEvents([ev], profiles)
+    await ratings.applyEvents([matchEvent('ABCE:m1', 'u1', 'u3', T0)], profiles)
+    await ratings.reset()
+    const r = await ratings.ranking('u1')
+    expect(r).toEqual({ top: [], total: 0, me: null })
+    // the event ledger is gone too: limits and ids start fresh
+    await ratings.applyEvents([ev], profiles)
+    expect((await ratings.ranking('u1')).me).toMatchObject({ rating: 1016, wins: 1, losses: 0 })
+  })
+
   it('someone without a rated match has no rank', async () => {
     const s = setup()
     await playCup(s, four)

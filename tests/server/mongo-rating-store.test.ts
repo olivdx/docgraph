@@ -65,4 +65,16 @@ describe('MongoRatingStore', () => {
     expect(await store.countCounted('match', 'a|b', T0)).toBe(1)
     expect(await store.countCounted('bonus', 'a|b', T0 - 1)).toBe(0)
   })
+
+  it('reset removes every rating and every event', async (ctx) => {
+    if (!db) return ctx.skip()
+    const store = new MongoRatingStore(db)
+    await store.apply('r1', { name: 'R', avatarUrl: null }, change(5), T0)
+    await store.claim({ _id: 'r-ev', kind: 'match', key: 'x|y', counted: true, at: T0, expiresAt: new Date(T0 + 1e9) })
+    await store.reset()
+    expect(await store.count()).toBe(0)
+    expect(await store.top(10)).toEqual([])
+    expect(await store.countCounted('match', 'x|y', T0 - 1)).toBe(0)
+    expect(await store.claim({ _id: 'r-ev', kind: 'match', key: 'x|y', counted: true, at: T0, expiresAt: new Date(T0 + 1e9) })).toBe(true)
+  })
 })
