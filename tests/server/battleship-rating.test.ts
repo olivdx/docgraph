@@ -41,10 +41,10 @@ async function startCup(s: S, users: TelegramUser[]): Promise<string> {
   return code
 }
 
-/** Both open the match, lock fleets, and `winner` sinks everything while the other only hits water. */
+/** Both press Ready, lock fleets, and `winner` sinks everything while the other only hits water. */
 async function playMatch(s: S, code: string, id: string, p: TelegramUser, q: TelegramUser, winner: TelegramUser) {
-  await s.svc.getMatch(code, id, p)
-  await s.svc.getMatch(code, id, q)
+  await s.svc.ready(code, id, p)
+  await s.svc.ready(code, id, q)
   const seatP = (await s.svc.saveFleet(code, id, p, FLEET, true)).you!
   let v: BattleMatchView = await s.svc.saveFleet(code, id, q, FLEET, true)
   const used = { a: 0, b: 0 }
@@ -134,8 +134,8 @@ describe('Battleship ratings', () => {
     const s = setup()
     const code = await startCup(s, four)
     const [[id, [p, q]]] = await liveMatches(s, code, four)
-    await s.svc.getMatch(code, id, p)
-    await s.svc.getMatch(code, id, q)
+    await s.svc.ready(code, id, p)
+    await s.svc.ready(code, id, q)
     await s.svc.saveFleet(code, id, p, FLEET, true)
     await s.svc.saveFleet(code, id, q, FLEET, true)
     await s.svc.resign(code, id, q)

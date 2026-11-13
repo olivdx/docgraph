@@ -146,14 +146,18 @@ export class BattleshipService {
 
   // ---- match commands --------------------------------------------------------------------------
 
-  /** Opens a match: a participant is marked ready (and counted as present); a watcher only settles. */
+  /** Opens a match: a participant is counted as present; nobody is made ready by looking (see `ready`). */
   async getMatch(code: string, matchId: string, user: TelegramUser): Promise<BattleMatchView> {
-    const res = await this.mutate(
-      code,
-      (loaded, p, t, settled) =>
-        isParticipant(loaded, matchId, user.id) ? markBattleReady(loaded, matchId, user.id, t, this.deps.rng, p) : settled(),
-      { matchId, userId: user.id },
-    )
+    const res = await this.mutate(code, (_l, _p, _t, settled) => settled(), { matchId, userId: user.id })
+    return toBattleMatchView(res.room, matchId, user.id, res.now, res.presence)
+  }
+
+  /** A player agrees to start: the match begins (fleet placement) once both players have. */
+  async ready(code: string, matchId: string, user: TelegramUser): Promise<BattleMatchView> {
+    const res = await this.mutate(code, (loaded, p, t) => markBattleReady(loaded, matchId, user.id, t, this.deps.rng, p), {
+      matchId,
+      userId: user.id,
+    })
     return toBattleMatchView(res.room, matchId, user.id, res.now, res.presence)
   }
 

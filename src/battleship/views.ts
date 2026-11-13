@@ -74,6 +74,8 @@ export interface BattleMatchView {
   players: Record<Seat, { name: string; avatarUrl: string | null } | null>
   /** Ships the viewer may see: their own, the opponent's sunk ones, everything once finished. */
   fleets: Record<Seat, Ship[]>
+  /** Who has pressed Ready: the match starts (fleet placement) once both have. */
+  ready: Record<Seat, boolean>
   locked: Record<Seat, boolean>
   /** Shots fired BY each seat. */
   shots: Record<Seat, ShotView[]>
@@ -213,6 +215,7 @@ export function toBattleMatchView(
     you,
     players: { a: playerOf(m.a), b: playerOf(m.b) },
     fleets: { a: visibleFleet('a'), b: visibleFleet('b') },
+      ready: { a: m.readyAt.a !== null, b: m.readyAt.b !== null },
     locked: { a: m.lockedAt.a !== null, b: m.lockedAt.b !== null },
     shots: { a: shotViews('a'), b: shotViews('b') },
     turn: playing ? m.turn : null,

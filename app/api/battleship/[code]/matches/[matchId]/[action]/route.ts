@@ -18,6 +18,8 @@ export async function POST(req: Request, ctx: RouteContext<'/api/battleship/[cod
         const { cell, seq } = parseFireBody(await readJson(req))
         return Response.json(await svc.fire(code, matchId, user, cell, seq))
       }
+      case 'ready':
+        return Response.json(await svc.ready(code, matchId, user))
       case 'resign':
         return Response.json(await svc.resign(code, matchId, user))
       default:

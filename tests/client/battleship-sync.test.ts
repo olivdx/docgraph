@@ -17,6 +17,7 @@ function view(you: 'a' | 'b' | null, a: ShotView[], b: ShotView[], fleets: Battl
     you,
     players: { a: { name: 'A', avatarUrl: null }, b: { name: 'B', avatarUrl: null } },
     fleets,
+    ready: { a: true, b: true },
     locked: { a: true, b: true },
     shots: { a, b },
     turn: 'a',

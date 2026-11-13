@@ -10,7 +10,7 @@ import { battleshipMatchChannel } from '@/src/realtime/channels'
 import { FLEET } from '@/src/battleship/constants'
 import type { Seat, Ship } from '@/src/battleship/types'
 import type { BattleMatchView } from '@/src/battleship/views'
-import { BattleControls, PlacementButtons, coordName } from '@/src/client/battleship/battle-controls'
+import { BattleControls, PlacementButtons, READY_BTN, coordName } from '@/src/client/battleship/battle-controls'
 import { MatchHud } from '@/src/client/battleship/match-hud'
 import { FloatingRotate, ShipTray, usePlacement, type Placement } from '@/src/client/battleship/placement-controls'
 import { boardOf, isNewerView, latestView, newShots, type Board, type NewShot } from '@/src/client/battleship/sync'
@@ -194,6 +194,14 @@ export default function BattleMatchPage() {
     setBusy(false)
   }, [view, target, busy, post, scene])
 
+  // The match starts only once both players have agreed.
+  const pressReady = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    await post('ready')
+    setBusy(false)
+  }, [busy, post])
+
   const save = useCallback(
     async (ships: Ship[], lock: boolean) => (await post('fleet', { ships, lock })) !== null,
     [post],
@@ -260,7 +268,9 @@ export default function BattleMatchPage() {
   const hint = !you
     ? '👁 Watching'
     : view.status === 'pending'
-      ? `Waiting for ${foeName} to open the match`
+      ? !view.ready[you]
+        ? `Press READY to start${view.ready[other(you)] ? ` · ${foeName} is ready` : ''}`
+        : `Waiting for ${foeName} to press Ready`
       : view.status === 'playing'
         ? yourTurn
           ? target === null
@@ -353,6 +363,14 @@ export default function BattleMatchPage() {
           say={say}
           bind={bindPlacement}
         />
+      ) : view.status === 'pending' && you ? (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <ReadyTag name="You" ready={view.ready[you]} />
+          <button type="button" disabled={view.ready[you] || busy} onClick={() => void pressReady()} className={READY_BTN}>
+            {view.ready[you] ? '✓' : 'READY'}
+          </button>
+          <ReadyTag name={foeName} ready={view.ready[other(you)]} right />
+        </div>
       ) : view.status === 'playing' && you ? (
         <BattleControls
           target={target}
@@ -376,6 +394,18 @@ export default function BattleMatchPage() {
         <div className="h-[78px]" />
       )}
     </main>
+  )
+}
+
+/** Before the match: who has agreed to start. */
+function ReadyTag({ name, ready, right = false }: { name: string; ready: boolean; right?: boolean }) {
+  return (
+    <div className={`flex min-w-0 flex-col gap-0.5 text-[10px] font-extrabold tracking-wider text-muted uppercase ${right ? 'items-end text-right' : ''}`}>
+      <span className="max-w-full truncate">{name}</span>
+      <b className={`font-display text-sm font-semibold tracking-normal normal-case ${ready ? 'text-win' : 'text-text'}`}>
+        {ready ? '✓ Ready' : 'Not ready'}
+      </b>
+    </div>
   )
 }
 

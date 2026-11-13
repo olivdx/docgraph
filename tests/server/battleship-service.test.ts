@@ -37,14 +37,14 @@ async function err(p: Promise<unknown>): Promise<RoomError> {
   throw new Error('expected RoomError')
 }
 
-/** Creates a 2-player cup, starts it and opens the match for both. Returns code and match id. */
+/** Creates a 2-player cup, starts it and has both players press Ready. Returns code and match id. */
 async function twoPlayerMatch(s: ReturnType<typeof setup>) {
   const { code } = await s.svc.create(tg(1))
   await s.svc.join(code, tg(2))
   const room = await s.svc.start(code, tg(1))
   const id = room.yourMatch!.id
-  await s.svc.getMatch(code, id, tg(1))
-  await s.svc.getMatch(code, id, tg(2))
+  await s.svc.ready(code, id, tg(1))
+  await s.svc.ready(code, id, tg(2))
   return { code, id }
 }
 
@@ -102,6 +102,51 @@ describe('BattleshipService', () => {
     const saved = await s.svc.saveFleet(code, id, tg(1), FLEET, true)
     expect(saved.version).toBeGreaterThan(before.version)
     expect((await s.svc.getMatch(code, id, tg(2))).version).toBe(saved.version)
+  })
+
+  it('a match starts only when both players have pressed Ready; opening it is not enough', async () => {
+    const s = setup()
+    const { code } = await s.svc.create(tg(1))
+    await s.svc.join(code, tg(2))
+    const id = (await s.svc.start(code, tg(1))).yourMatch!.id
+    await s.svc.getMatch(code, id, tg(1))
+    let v = await s.svc.getMatch(code, id, tg(2))
+    expect(v.status).toBe('pending')
+    expect(v.ready).toEqual({ a: false, b: false })
+
+    v = await s.svc.ready(code, id, tg(1))
+    expect(v.status).toBe('pending')
+    expect(v.ready[v.you!]).toBe(true)
+    expect(v.ready[v.you === 'a' ? 'b' : 'a']).toBe(false)
+    // pressing again changes nothing
+    expect((await s.svc.ready(code, id, tg(1))).status).toBe('pending')
+
+    v = await s.svc.ready(code, id, tg(2))
+    expect(v.status).toBe('placing')
+    expect(v.ready).toEqual({ a: true, b: true })
+  })
+
+  it('only the two players can press Ready', async () => {
+    const s = setup()
+    const { code } = await s.svc.create(tg(1))
+    await s.svc.join(code, tg(2))
+    const id = (await s.svc.start(code, tg(1))).yourMatch!.id
+    expect((await err(s.svc.ready(code, id, tg(9)))).code).toBe('not_participant')
+    expect((await s.svc.getMatch(code, id, tg(9))).ready).toEqual({ a: false, b: false })
+  })
+
+  it('whoever has not pressed Ready within 60 s loses by no-show, even with the match open', async () => {
+    const s = setup()
+    const { code } = await s.svc.create(tg(1))
+    await s.svc.join(code, tg(2))
+    const id = (await s.svc.start(code, tg(1))).yourMatch!.id
+    await s.svc.ready(code, id, tg(1))
+    await s.svc.getMatch(code, id, tg(2))
+    s.clock.t += 61_000
+    const v = await s.svc.getMatch(code, id, tg(1))
+    expect(v.status).toBe('finished')
+    expect(v.endReason).toBe('no_show')
+    expect(v.winner).toBe(v.you)
   })
 
   it('reload mid-placement returns the saved ships', async () => {
